@@ -1,0 +1,8 @@
+[package]
+name = "which"
+version = "0.1.0"
+authors = ["fangyuanziti <tiziyuanfang@gmail.com>"]
+repository = "https://github.com/fangyuanziti/which-rs.git"
+documentation = "http://fangyuanziti.github.io/which-rs/which/"
+license = "MIT"
+description= "A Rust equivalent of Unix command \"which\"."
