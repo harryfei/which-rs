@@ -2,9 +2,9 @@
 
 A Rust equivalent of Unix command "which".
 
-## Exmaple
+## Example
 
-To find wihch rustc exectable binary is using.
+To find which rustc exectable binary is using.
 
 ``` rust
 use which::which;
