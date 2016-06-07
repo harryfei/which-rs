@@ -13,9 +13,15 @@
 //!
 //! ```
 
-use std::path::PathBuf;
+extern crate libc;
+
+use std::path::{Path,PathBuf};
 use std::{env, fs};
+#[cfg(unix)]
+use std::ffi::CString;
 use std::ffi::OsStr;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 
 fn is_exist(bin_path: &PathBuf) -> bool {
 
@@ -26,6 +32,19 @@ fn is_exist(bin_path: &PathBuf) -> bool {
         _ => false
     }
 }
+
+/// Return `true` if `path` is executable.
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    CString::new(path.as_os_str().as_bytes())
+        .and_then(|c| {
+            Ok(unsafe { libc::access(c.as_ptr(), libc::X_OK) == 0 })
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(_path: &Path) -> bool { true }
 
 
 /// Find a exectable binary's path by name.
@@ -47,7 +66,7 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T)
         |paths| -> Option<PathBuf> {
             for path in env::split_paths(&paths) {
                 let bin_path = path.join(binary_name.as_ref());
-                if is_exist(&bin_path) {
+                if is_exist(&bin_path) && is_executable(&bin_path) {
                     return Some(bin_path);
                 }
             }

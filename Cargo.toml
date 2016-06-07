@@ -6,3 +6,6 @@ repository = "https://github.com/fangyuanziti/which-rs.git"
 documentation = "http://fangyuanziti.github.io/which-rs/which/"
 license = "MIT"
 description= "A Rust equivalent of Unix command \"which\"."
+
+[dependencies]
+libc = "0.2.10"
