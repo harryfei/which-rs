@@ -15,6 +15,7 @@
 
 use std::path::PathBuf;
 use std::{env, fs};
+use std::ffi::OsStr;
 
 fn is_exist(bin_path: &PathBuf) -> bool {
 
@@ -39,13 +40,13 @@ fn is_exist(bin_path: &PathBuf) -> bool {
 /// assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
 ///
 /// ```
-pub fn which(binary_name: &'static str)
+pub fn which<T: AsRef<OsStr>>(binary_name: T)
              -> Result<PathBuf, &'static str> {
 
     let path_buf = env::var_os("PATH").and_then(
         |paths| -> Option<PathBuf> {
             for path in env::split_paths(&paths) {
-                let bin_path = path.join(binary_name);
+                let bin_path = path.join(binary_name.as_ref());
                 if is_exist(&bin_path) {
                     return Some(bin_path);
                 }
