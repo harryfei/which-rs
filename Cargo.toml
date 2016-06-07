@@ -9,3 +9,6 @@ description= "A Rust equivalent of Unix command \"which\"."
 
 [dependencies]
 libc = "0.2.10"
+
+[dev-dependencies]
+tempdir = "0.3.4"
