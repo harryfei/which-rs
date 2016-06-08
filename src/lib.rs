@@ -1,9 +1,9 @@
 //! which
 //!
-//! A Rust equivalent of Unix command "which".
-//! # Exmaple:
+//! A Rust equivalent of Unix command `which(1)`.
+//! # Example:
 //!
-//! To find wihch rustc exectable binary is using.
+//! To find which rustc executable binary is using:
 //!
 //! ``` norun
 //! use which::which;
