@@ -25,7 +25,7 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 
-fn is_exist(bin_path: &PathBuf) -> bool {
+fn is_exist(bin_path: &Path) -> bool {
 
     match fs::metadata(bin_path).map(|metadata|{
         metadata.is_file()
@@ -51,6 +51,15 @@ fn is_executable(_path: &Path) -> bool { true }
 
 /// Find a exectable binary's path by name.
 ///
+/// If given an absolute path, returns it if the file exists and is executable.
+///
+/// If given a relative path, returns an absolute path to the file if
+/// it exists and is executable.
+///
+/// If given a string without path separators, looks for a file named
+/// `binary_name` at each directory in `$PATH` and if it finds an executable
+/// file there, returns it.
+///
 /// # Example
 ///
 /// ``` norun
@@ -63,31 +72,49 @@ fn is_executable(_path: &Path) -> bool { true }
 /// ```
 pub fn which<T: AsRef<OsStr>>(binary_name: T)
              -> Result<PathBuf, &'static str> {
-    which_in(binary_name, env::var_os("PATH"))
+    env::current_dir()
+        .or_else(|_| Err("Couldn't get current directory"))
+        .and_then(|cwd| which_in(binary_name, env::var_os("PATH"), &cwd))
 }
 
-/// Find `binary_name` in the path list `paths`.
-pub fn which_in<T, U>(binary_name: T, paths: Option<U>)
+/// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
+pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V)
              -> Result<PathBuf, &'static str>
                 where T: AsRef<OsStr>,
-                U: AsRef<OsStr> {
-    let path_buf = paths.and_then(
-        |paths| -> Option<PathBuf> {
-            for path in env::split_paths(&paths) {
-                let bin_path = path.join(binary_name.as_ref());
-                if is_exist(&bin_path) && is_executable(&bin_path) {
-                    return Some(bin_path);
-                }
+                      U: AsRef<OsStr>,
+                      V: AsRef<Path> {
+    // Does it have a path separator?
+    let path = Path::new(binary_name.as_ref());
+    if path.components().count() > 1 {
+        if path.is_absolute() {
+            if is_exist(path) && is_executable(path) {
+                // Already fine.
+                Ok(PathBuf::from(path))
+            } else {
+                // Absolute path but it's not usable.
+                Err("Bad absolute path")
             }
-            return None;
-
-        });
-
-    match path_buf {
-        Some(path) => Ok(path),
-        None => Err("Can not find binary path")
+        } else {
+            // Try to make it absolute.
+            let mut new_path = PathBuf::from(cwd.as_ref());
+            new_path.push(path);
+            if is_exist(&new_path) && is_executable(&new_path) {
+                Ok(new_path)
+            } else {
+                // File doesn't exist or isn't executable.
+                Err("Bad relative path")
+            }
+        }
+    } else {
+        // No separator, look it up in `paths`.
+        paths.and_then(
+            |paths|
+            env::split_paths(paths.as_ref())
+                .map(|p| p.join(binary_name.as_ref()))
+                .skip_while(|p| !(is_exist(&p) && is_executable(&p)))
+                .next())
+            .ok_or("Cannot find binary path")
     }
-
 }
 
 #[cfg(test)]
@@ -95,7 +122,7 @@ mod test {
     use super::*;
 
     use std::env;
-    use std::ffi::OsString;
+    use std::ffi::{OsStr,OsString};
     use std::fs;
     use std::io;
     use std::path::{Path,PathBuf};
@@ -167,8 +194,8 @@ mod test {
         }
     }
 
-    fn _which(f: &TestFixture, path: &str) -> Result<PathBuf, &'static str> {
-        which_in(path, Some(f.paths.clone()))
+    fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> Result<PathBuf, &'static str> {
+        which_in(path, Some(f.paths.clone()), f.tempdir.path())
     }
 
     #[test]
@@ -188,7 +215,8 @@ mod test {
     #[test]
     fn test_which() {
         let f = TestFixture::new();
-        assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[0])
+        assert_eq!(_which(&f, &BIN_NAME).unwrap().canonicalize().unwrap(),
+                   f.bins[0])
     }
 
     #[test]
@@ -201,7 +229,28 @@ mod test {
     fn test_which_second() {
         let f = TestFixture::new();
         let b = f.mk_bin("b/another").unwrap();
-        assert_eq!(_which(&f, "another").unwrap(), b);
+        assert_eq!(_which(&f, "another").unwrap().canonicalize().unwrap(), b);
+    }
+
+    #[test]
+    fn test_which_absolute() {
+        let f = TestFixture::new();
+        assert_eq!(_which(&f, &f.bins[1]).unwrap().canonicalize().unwrap(),
+                   f.bins[1].canonicalize().unwrap());
+    }
+
+    #[test]
+    fn test_which_relative() {
+        let f = TestFixture::new();
+        assert_eq!(_which(&f, "b/bin").unwrap().canonicalize().unwrap(),
+                   f.bins[1].canonicalize().unwrap());
+    }
+
+    #[test]
+    fn test_which_relative_leading_dot() {
+        let f = TestFixture::new();
+        assert_eq!(_which(&f, "./b/bin").unwrap().canonicalize().unwrap(),
+                   f.bins[1].canonicalize().unwrap());
     }
 
     #[test]
@@ -211,5 +260,23 @@ mod test {
         let f = TestFixture::new();
         f.touch("b/another").unwrap();
         assert!(_which(&f, "another").is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_which_absolute_non_executable() {
+        // Shouldn't return non-executable files, even if given an absolute path.
+        let f = TestFixture::new();
+        let b = f.touch("b/another").unwrap();
+        assert!(_which(&f, &b).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_which_relative_non_executable() {
+        // Shouldn't return non-executable files.
+        let f = TestFixture::new();
+        f.touch("b/another").unwrap();
+        assert!(_which(&f, "b/another").is_err());
     }
 }
