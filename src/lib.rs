@@ -17,6 +17,7 @@ extern crate libc;
 #[cfg(test)]
 extern crate tempdir;
 
+use std::ascii::AsciiExt;
 use std::path::{Path,PathBuf};
 use std::{env, fs};
 #[cfg(unix)]
@@ -54,7 +55,7 @@ fn ensure_exe_extension<T: AsRef<Path>>(path: T) -> PathBuf {
         // Nothing to do.
         path.as_ref().to_path_buf()
     } else {
-        match path.as_ref().extension().map(|e| e == Path::new(env::consts::EXE_EXTENSION)) {
+        match path.as_ref().extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case(env::consts::EXE_EXTENSION)) {
             // Already has the right extension.
             Some(true) => path.as_ref().to_path_buf(),
             _ => {
@@ -151,6 +152,13 @@ fn test_exe_extension() {
 fn test_exe_extension_existing_extension() {
     assert_eq!(PathBuf::from("foo.bar.exe"),
                ensure_exe_extension("foo.bar"));
+}
+
+#[test]
+#[cfg(windows)]
+fn test_exe_extension_existing_extension_uppercase() {
+    assert_eq!(PathBuf::from("foo.EXE"),
+               ensure_exe_extension("foo.EXE"));
 }
 
 #[cfg(test)]
@@ -285,6 +293,17 @@ mod test {
     }
 
     #[test]
+    #[cfg(windows)]
+    fn test_which_absolute_path_case() {
+        // Test that an absolute path with an uppercase extension
+        // is accepted.
+        let f = TestFixture::new();
+        let p = f.bins[1].with_extension("EXE");
+        assert_eq!(_which(&f, &p).unwrap().canonicalize().unwrap(),
+                   f.bins[1].canonicalize().unwrap());
+    }
+
+    #[test]
     fn test_which_absolute_extension() {
         let f = TestFixture::new();
         // Don't append EXE_EXTENSION here.
@@ -306,6 +325,17 @@ mod test {
         // so test a relative path with an extension here.
         let f = TestFixture::new();
         let b = Path::new("b/bin").with_extension(env::consts::EXE_EXTENSION);
+        assert_eq!(_which(&f, &b).unwrap().canonicalize().unwrap(),
+                   f.bins[1].canonicalize().unwrap());
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_which_relative_extension_case() {
+        // Test that a relative path with an uppercase extension
+        // is accepted.
+        let f = TestFixture::new();
+        let b = Path::new("b/bin").with_extension("EXE");
         assert_eq!(_which(&f, &b).unwrap().canonicalize().unwrap(),
                    f.bins[1].canonicalize().unwrap());
     }
