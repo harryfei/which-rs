@@ -26,29 +26,6 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 
-fn is_exist(bin_path: &Path) -> bool {
-
-    match fs::metadata(bin_path).map(|metadata|{
-        metadata.is_file()
-    }) {
-        Ok(true) => true,
-        _ => false
-    }
-}
-
-/// Return `true` if `path` is executable.
-#[cfg(unix)]
-fn is_executable(path: &Path) -> bool {
-    CString::new(path.as_os_str().as_bytes())
-        .and_then(|c| {
-            Ok(unsafe { libc::access(c.as_ptr(), libc::X_OK) == 0 })
-        })
-        .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable(_path: &Path) -> bool { true }
-
 /// Like `Path::with_extension`, but don't replace an existing extension.
 fn ensure_exe_extension<T: AsRef<Path>>(path: T) -> PathBuf {
     if env::consts::EXE_EXTENSION.is_empty() {
@@ -104,38 +81,130 @@ pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V)
                 where T: AsRef<OsStr>,
                       U: AsRef<OsStr>,
                       V: AsRef<Path> {
-    // Does it have a path separator?
-    let path = ensure_exe_extension(binary_name.as_ref());
-    if path.components().count() > 1 {
-        if path.is_absolute() {
-            if is_exist(&path) && is_executable(&path) {
-                // Already fine.
-                Ok(path)
+    let binary_checker = CompositeChecker::new()
+        .add_checker(Box::new(ExistedChecker::new()))
+        .add_checker(Box::new(ExecutableChecker::new()));
+
+    let finder = Finder::new();
+
+    finder.find(binary_name, paths, cwd, &binary_checker)
+}
+
+struct Finder;
+
+impl Finder {
+    fn new() -> Finder {
+        Finder
+    }
+
+    fn find<T, U, V>(&self, binary_name: T, paths: Option<U>, cwd: V,
+                     binary_checker: &Checker)
+                     -> Result<PathBuf, &'static str>
+        where T: AsRef<OsStr>,
+              U: AsRef<OsStr>,
+              V: AsRef<Path> {
+
+        let path = ensure_exe_extension(binary_name.as_ref());
+
+        // Does it have a path separator?
+        if path.components().count() > 1 {
+            if path.is_absolute() {
+                if binary_checker.is_valid(&path) {
+                    // Already fine.
+                    Ok(path)
+                } else {
+                    // Absolute path but it's not usable.
+                    Err("Bad absolute path")
+                }
             } else {
-                // Absolute path but it's not usable.
-                Err("Bad absolute path")
+                // Try to make it absolute.
+                let mut new_path = PathBuf::from(cwd.as_ref());
+                new_path.push(path);
+                let new_path = ensure_exe_extension(new_path);
+                if binary_checker.is_valid(&new_path) {
+                    Ok(new_path)
+                } else {
+                    // File doesn't exist or isn't executable.
+                    Err("Bad relative path")
+                }
             }
         } else {
-            // Try to make it absolute.
-            let mut new_path = PathBuf::from(cwd.as_ref());
-            new_path.push(path);
-            let new_path = ensure_exe_extension(new_path);
-            if is_exist(&new_path) && is_executable(&new_path) {
-                Ok(new_path)
-            } else {
-                // File doesn't exist or isn't executable.
-                Err("Bad relative path")
-            }
+            // No separator, look it up in `paths`.
+            paths.and_then(
+                |paths|
+                env::split_paths(paths.as_ref())
+                    .map(|p| ensure_exe_extension(p.join(binary_name.as_ref())))
+                    .skip_while(|p| !(binary_checker.is_valid(&p)))
+                    .next())
+                .ok_or("Cannot find binary path")
         }
-    } else {
-        // No separator, look it up in `paths`.
-        paths.and_then(
-            |paths|
-            env::split_paths(paths.as_ref())
-                .map(|p| ensure_exe_extension(p.join(binary_name.as_ref())))
-                .skip_while(|p| !(is_exist(&p) && is_executable(&p)))
-                .next())
-            .ok_or("Cannot find binary path")
+    }
+}
+
+
+trait Checker {
+    fn is_valid(&self, path: &Path) -> bool;
+}
+
+struct ExecutableChecker;
+
+impl ExecutableChecker {
+    fn new() -> ExecutableChecker {
+        ExecutableChecker
+    }
+}
+
+impl Checker for ExecutableChecker {
+    #[cfg(unix)]
+    fn is_valid(&self, path: &Path) -> bool {
+        CString::new(path.as_os_str().as_bytes())
+            .and_then(|c| {
+                Ok(unsafe { libc::access(c.as_ptr(), libc::X_OK) == 0 })
+            })
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(unix))]
+    fn is_valid(&self, _path: &Path) -> bool { true }
+}
+
+struct ExistedChecker;
+
+impl ExistedChecker {
+    fn new() -> ExistedChecker {
+        ExistedChecker
+    }
+}
+
+impl Checker for ExistedChecker {
+    fn is_valid(&self, path: &Path) -> bool {
+        fs::metadata(path).map(|metadata|{
+            metadata.is_file()
+        }).unwrap_or(false)
+    }
+}
+
+struct CompositeChecker {
+    checkers: Vec<Box<Checker>>
+}
+
+impl CompositeChecker {
+    fn new() -> CompositeChecker {
+        CompositeChecker {
+            checkers: Vec::new()
+        }
+    }
+
+    fn add_checker(mut self, checker: Box<Checker>) -> CompositeChecker {
+        self.checkers.push(checker);
+        self
+    }
+}
+
+impl Checker for CompositeChecker {
+    fn is_valid(&self, path: &Path) -> bool {
+        self.checkers.iter()
+            .all(|checker| checker.is_valid(path))
     }
 }
 
