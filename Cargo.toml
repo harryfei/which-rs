@@ -6,7 +6,7 @@ repository = "https://github.com/fangyuanziti/which-rs.git"
 documentation = "http://fangyuanziti.github.io/which-rs/which/"
 license = "MIT"
 description= "A Rust equivalent of Unix command \"which\"."
-categories = ["util"]
+categories = ["command-line-utilities"]
 keywords = ["which", "which-rs", "unix", "command"]
 
 [dependencies]
