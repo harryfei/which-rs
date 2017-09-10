@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/fangyuanziti/which-rs.svg?branch=master)](https://travis-ci.org/fangyuanziti/which-rs)
+
 # which
 
 A Rust equivalent of Unix command "which".
