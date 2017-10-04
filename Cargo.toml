@@ -3,9 +3,9 @@ name = "which"
 version = "1.0.2"
 authors = ["fangyuanziti <tiziyuanfang@gmail.com>"]
 repository = "https://github.com/fangyuanziti/which-rs.git"
-documentation = "http://fangyuanziti.github.io/which-rs/which/"
 license = "MIT"
-description= "A Rust equivalent of Unix command \"which\"."
+description= "A Rust equivalent of Unix command \"which\". Locate installed execuable in cross platforms."
+readme= "README.md"
 categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
