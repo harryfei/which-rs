@@ -2,11 +2,17 @@
 
 # which
 
-A Rust equivalent of Unix command "which".
+A Rust equivalent of Unix command "which". Locate installed execuable in cross platforms.
+
+## Support platforms
+
+* Linux
+* Windows
+* macOS
 
 ## Example
 
-To find which rustc exectable binary is using.
+To find which rustc exectable binary is using. Locate installed execuable in cross platforms.
 
 ``` rust
 use which::which;
@@ -18,4 +24,4 @@ assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
 
 ## Documentation
 
-The documentation is [available online](http://fangyuanziti.github.io/which-rs/which/).
+The documentation is [available online](https://docs.rs/which/).
