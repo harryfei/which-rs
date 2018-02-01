@@ -14,4 +14,5 @@ keywords = ["which", "which-rs", "unix", "command"]
 libc = "0.2.10"
 
 [dev-dependencies]
+failure = "0.1.1"
 tempdir = "0.3.4"

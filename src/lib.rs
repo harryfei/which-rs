@@ -13,6 +13,8 @@
 //!
 //! ```
 
+#[cfg(test)]
+extern crate failure;
 extern crate libc;
 #[cfg(test)]
 extern crate tempdir;
@@ -102,6 +104,18 @@ where
 #[derive(Debug)]
 pub struct Error {
     msg: &'static str,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl std::error::Error for Error {
+    fn description(&self) -> &str {
+        self.msg
+    }
 }
 
 impl Error {
@@ -486,5 +500,18 @@ mod test {
         let f = TestFixture::new();
         f.touch("b/another").unwrap();
         assert!(_which(&f, "b/another").is_err());
+    }
+
+    #[test]
+    fn test_failure() {
+        let f = TestFixture::new();
+
+        let run = || -> std::result::Result<PathBuf, failure::Error> {
+            // Test the conversion to failure
+            let p = _which(&f, "./b/bin")?;
+            Ok(p)
+        };
+
+        let _ = run();
     }
 }
