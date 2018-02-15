@@ -17,7 +17,6 @@ extern crate libc;
 #[cfg(test)]
 extern crate tempdir;
 
-use std::ascii::AsciiExt;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 #[cfg(unix)]
