@@ -19,7 +19,12 @@ extern crate tempdir;
 
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+
+// Remove the `AsciiExt` will make `which-rs` build failed in older versions of Rust.
+// Please Keep it here though we don't need it in the latest Rust version.
+#[allow(unused)]
 use std::ascii::AsciiExt;
+
 #[cfg(unix)]
 use std::ffi::CString;
 use std::ffi::OsStr;
