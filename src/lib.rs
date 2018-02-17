@@ -19,6 +19,7 @@ extern crate tempdir;
 
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use std::ascii::AsciiExt;
 #[cfg(unix)]
 use std::ffi::CString;
 use std::ffi::OsStr;
