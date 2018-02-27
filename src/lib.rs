@@ -24,7 +24,7 @@ use std::{env, fs};
 
 // Remove the `AsciiExt` will make `which-rs` build failed in older versions of Rust.
 // Please Keep it here though we don't need it in the new Rust version(>=1.23).
-#[allow(unused)]
+#[allow(unused_imports)]
 use std::ascii::AsciiExt;
 
 #[cfg(unix)]
@@ -177,10 +177,10 @@ impl Finder {
                 .and_then(|paths| {
                     env::split_paths(paths.as_ref())
                         .map(|p| ensure_exe_extension(p.join(binary_name.as_ref())))
-                        .skip_while(|p| !(binary_checker.is_valid(&p)))
+                        .skip_while(|p| !(binary_checker.is_valid(p)))
                         .next()
                 })
-                .ok_or(Error::new("Cannot find binary path"))
+                .ok_or_else(|| Error::new("Cannot find binary path"))
         }
     }
 }
