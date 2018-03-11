@@ -1,50 +1,47 @@
-use std::env;
-use std::path::PathBuf;
 use std::path::Path;
 
-/// Like `Path::with_extension`, but don't replace an existing extension.
-pub fn ensure_exe_extension<T: AsRef<Path>>(path: T) -> PathBuf {
-    if env::consts::EXE_EXTENSION.is_empty() {
-        // Nothing to do.
-        path.as_ref().to_path_buf()
-    } else {
-        match path.as_ref()
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.eq_ignore_ascii_case(env::consts::EXE_EXTENSION))
-        {
-            // Already has the right extension.
-            Some(true) => path.as_ref().to_path_buf(),
-            _ => {
-                // Append the extension.
-                let mut s = path.as_ref().to_path_buf().into_os_string();
-                s.push(".");
-                s.push(env::consts::EXE_EXTENSION);
-                PathBuf::from(s)
-            }
-        }
+/// Check if given path has extension which in the given vector.
+pub fn check_extension<T: AsRef<Path>, S: AsRef<str>>(path: T, exts_vec: &Vec<S>) -> bool {
+    match path.as_ref()
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| exts_vec.iter().any(|ext| e.eq_ignore_ascii_case(&ext.as_ref()[1..])))
+    {
+        Some(true) => true,
+        _ => false,
     }
 }
 
-#[test]
-fn test_exe_extension() {
-    let expected = PathBuf::from("foo").with_extension(env::consts::EXE_EXTENSION);
-    assert_eq!(expected, ensure_exe_extension(PathBuf::from("foo")));
-    let p = expected.clone();
-    assert_eq!(expected, ensure_exe_extension(p));
-}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::path::PathBuf;
 
-#[test]
-#[cfg(windows)]
-fn test_exe_extension_existing_extension() {
-    assert_eq!(
-        PathBuf::from("foo.bar.exe"),
-        ensure_exe_extension("foo.bar")
-    );
-}
+    #[test]
+    fn test_extension_in_extension_vector() {
+        // Case insensitive
+        assert!(
+            check_extension(
+                PathBuf::from("foo.exe"),
+                &vec![".COM", ".EXE", ".CMD"]
+            )
+        );
 
-#[test]
-#[cfg(windows)]
-fn test_exe_extension_existing_extension_uppercase() {
-    assert_eq!(PathBuf::from("foo.EXE"), ensure_exe_extension("foo.EXE"));
+        assert!(
+            check_extension(
+                PathBuf::from("foo.CMD"),
+                &vec![".COM", ".EXE", ".CMD"]
+            )
+        );
+    }
+
+    #[test]
+    fn test_extension_not_in_extension_vector() {
+        assert!(
+            !check_extension(
+                PathBuf::from("foo.bar"),
+                &vec![".COM", ".EXE", ".CMD"]
+            )
+        );
+    }
 }
