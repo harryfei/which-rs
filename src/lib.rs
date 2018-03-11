@@ -15,6 +15,10 @@
 
 #[macro_use]
 extern crate failure;
+#[cfg(windows)]
+#[macro_use]
+extern crate lazy_static;
+
 extern crate libc;
 #[cfg(test)]
 extern crate tempdir;
@@ -22,6 +26,7 @@ extern crate tempdir;
 use failure::ResultExt;
 mod finder;
 mod checker;
+#[cfg(windows)]
 mod helper;
 mod error;
 
@@ -124,7 +129,7 @@ mod test {
         fs::File::create(&b).and_then(|_f| b.canonicalize())
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     fn mk_bin(dir: &Path, path: &str) -> io::Result<PathBuf> {
         touch(dir, path)
     }

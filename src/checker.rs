@@ -24,7 +24,7 @@ impl Checker for ExecutableChecker {
             .unwrap_or(false)
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     fn is_valid(&self, _path: &Path) -> bool {
         true
     }
