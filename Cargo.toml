@@ -14,8 +14,5 @@ keywords = ["which", "which-rs", "unix", "command"]
 failure = "0.1.1"
 libc = "0.2.10"
 
-[target.'cfg(windows)'.dependencies]
-lazy_static = "1.0"
-
 [dev-dependencies]
 tempdir = "0.3.4"

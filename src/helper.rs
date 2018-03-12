@@ -1,7 +1,7 @@
 use std::path::Path;
 
 /// Check if given path has extension which in the given vector.
-pub fn check_extension<T: AsRef<Path>, S: AsRef<str>>(path: T, exts_vec: &Vec<S>) -> bool {
+pub fn has_executable_extension<T: AsRef<Path>, S: AsRef<str>>(path: T, exts_vec: &Vec<S>) -> bool {
     match path.as_ref()
         .extension()
         .and_then(|e| e.to_str())
@@ -21,14 +21,14 @@ mod test {
     fn test_extension_in_extension_vector() {
         // Case insensitive
         assert!(
-            check_extension(
+            has_executable_extension(
                 PathBuf::from("foo.exe"),
                 &vec![".COM", ".EXE", ".CMD"]
             )
         );
 
         assert!(
-            check_extension(
+            has_executable_extension(
                 PathBuf::from("foo.CMD"),
                 &vec![".COM", ".EXE", ".CMD"]
             )
@@ -38,7 +38,7 @@ mod test {
     #[test]
     fn test_extension_not_in_extension_vector() {
         assert!(
-            !check_extension(
+            !has_executable_extension(
                 PathBuf::from("foo.bar"),
                 &vec![".COM", ".EXE", ".CMD"]
             )
