@@ -20,14 +20,14 @@ extern crate libc;
 extern crate tempdir;
 
 use failure::ResultExt;
-mod finder;
 mod checker;
+mod error;
+mod finder;
 #[cfg(windows)]
 mod helper;
-mod error;
 
-use std::path::{Path, PathBuf};
 use std::env;
+use std::path::{Path, PathBuf};
 
 // Remove the `AsciiExt` will make `which-rs` build failed in older versions of Rust.
 // Please Keep it here though we don't need it in the new Rust version(>=1.23).
@@ -36,11 +36,11 @@ use std::ascii::AsciiExt;
 
 use std::ffi::OsStr;
 
-use finder::Finder;
 use checker::CompositeChecker;
-use checker::ExistedChecker;
 use checker::ExecutableChecker;
+use checker::ExistedChecker;
 pub use error::*;
+use finder::Finder;
 
 /// Find a exectable binary's path by name.
 ///
@@ -72,7 +72,7 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<PathBuf> {
 pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<PathBuf>
 where
     T: AsRef<OsStr>,
-    U: AsRef<OsStr>,
+    U: AsRef<OsStr> + Clone,
     V: AsRef<Path>,
 {
     let binary_checker = CompositeChecker::new()
@@ -343,7 +343,6 @@ mod test {
             f.bins[5].canonicalize().unwrap()
         );
     }
-
 
     #[test]
     #[cfg(windows)]
