@@ -13,7 +13,6 @@
 //!
 //! ```
 
-#[macro_use]
 extern crate failure;
 extern crate libc;
 #[cfg(test)]

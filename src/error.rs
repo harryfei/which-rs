@@ -9,15 +9,26 @@ pub struct Error {
 
 // To suppress false positives from cargo-clippy
 #[cfg_attr(feature = "cargo-clippy", allow(empty_line_after_outer_attr))]
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum ErrorKind {
-    #[fail(display = "Bad absolute path")] BadAbsolutePath,
+    BadAbsolutePath,
+    BadRelativePath,
+    CannotFindBinaryPath,
+    CannotGetCurrentDir,
+}
 
-    #[fail(display = "Bad relative path")] BadRelativePath,
+impl Fail for ErrorKind {}
 
-    #[fail(display = "Cannot find binary path")] CannotFindBinaryPath,
-
-    #[fail(display = "Cannot get current directory")] CannotGetCurrentDir,
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let display = match *self {
+            ErrorKind::BadAbsolutePath => "Bad absolute path",
+            ErrorKind::BadRelativePath => "Bad relative path",
+            ErrorKind::CannotFindBinaryPath => "Cannot find binary path",
+            ErrorKind::CannotGetCurrentDir => "Cannot get current directory",
+        };
+        f.write_str(display)
+    }
 }
 
 impl Fail for Error {
