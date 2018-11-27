@@ -72,7 +72,7 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<PathBuf> {
 pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<PathBuf>
 where
     T: AsRef<OsStr>,
-    U: AsRef<OsStr> + Clone,
+    U: AsRef<OsStr>,
     V: AsRef<Path>,
 {
     let binary_checker = CompositeChecker::new()
