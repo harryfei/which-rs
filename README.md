@@ -3,7 +3,7 @@
 
 # which
 
-A Rust equivalent of Unix command "which". Locate installed execuable in cross platforms.
+A Rust equivalent of Unix command "which". Locate installed executable in cross platforms.
 
 ## Support platforms
 
@@ -13,7 +13,7 @@ A Rust equivalent of Unix command "which". Locate installed execuable in cross p
 
 ## Example
 
-To find which rustc exectable binary is using. Locate installed execuable in cross platforms.
+To find which rustc exectable binary is using. Locate installed executable in cross platforms.
 
 ``` rust
 use which::which;
