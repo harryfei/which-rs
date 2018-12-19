@@ -15,5 +15,8 @@ keywords = ["which", "which-rs", "unix", "command"]
 either = "1.6"
 libc = "0.2.65"
 
+[target.'cfg(windows)'.dependencies]
+lazy_static = "1"
+
 [dev-dependencies]
 tempdir = "0.3.7"
