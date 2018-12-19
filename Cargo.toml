@@ -19,6 +19,9 @@ default-features = false
 features = ["std"]
 optional = true
 
+[target.'cfg(windows)'.dependencies]
+lazy_static = "1"
+
 [dev-dependencies]
 tempdir = "0.3.7"
 

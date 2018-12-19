@@ -16,6 +16,9 @@
 #[cfg(feature = "failure")]
 extern crate failure;
 extern crate libc;
+#[cfg(windows)]
+#[macro_use]
+extern crate lazy_static;
 
 #[cfg(feature = "failure")]
 use failure::ResultExt;

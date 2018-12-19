@@ -3,8 +3,6 @@ use error::*;
 use helper::has_executable_extension;
 use std::env;
 use std::ffi::OsStr;
-#[cfg(windows)]
-use std::ffi::OsString;
 use std::iter;
 use std::path::{Path, PathBuf};
 
@@ -119,19 +117,35 @@ impl Finder {
     where
         P: IntoIterator<Item = PathBuf>,
     {
-        // Read PATHEXT env variable and split it into vector of String
-        let path_exts =
-            env::var_os("PATHEXT").unwrap_or(OsString::from(env::consts::EXE_EXTENSION));
-
-        let exe_extension_vec = env::split_paths(&path_exts)
-            .filter_map(|e| e.to_str().map(|e| e.to_owned()))
-            .collect::<Vec<_>>();
+        // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+        // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
+        // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
+        // hence its retention.)
+        lazy_static! {
+            static ref PATH_EXTENSIONS: Vec<String> =
+                env::var("PATHEXT")
+                    .map(|pathext| {
+                        pathext.split(';')
+                            .filter_map(|s| {
+                                if s.as_bytes()[0] == b'.' {
+                                    Some(s.to_owned())
+                                } else {
+                                    // Invalid segment; just ignore it.
+                                    None
+                                }
+                            })
+                            .collect()
+                    })
+                    // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                    // improbable and would probably break Windows badly. Still, don't crash:
+                    .unwrap_or(vec![]);
+        }
 
         paths
             .into_iter()
             .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
                 // Check if path already have executable extension
-                if has_executable_extension(&p, &exe_extension_vec) {
+                if has_executable_extension(&p, &PATH_EXTENSIONS) {
                     Box::new(iter::once(p))
                 } else {
                     // Appended paths with windows executable extensions.
@@ -140,15 +154,13 @@ impl Finder {
                     // c:/windows/bin.EXE
                     // c:/windows/bin.CMD
                     // ...
-                    let ps = exe_extension_vec.clone().into_iter().map(move |e| {
+                    Box::new(PATH_EXTENSIONS.iter().map(move |e| {
                         // Append the extension.
-                        let mut p = p.clone().to_path_buf().into_os_string();
+                        let mut p = p.clone().into_os_string();
                         p.push(e);
 
                         PathBuf::from(p)
-                    });
-
-                    Box::new(ps)
+                    }))
                 }
             })
     }
