@@ -26,11 +26,6 @@ mod helper;
 use std::env;
 use std::path::{Path, PathBuf};
 
-// Remove the `AsciiExt` will make `which-rs` build failed in older versions of Rust.
-// Please Keep it here though we don't need it in the new Rust version(>=1.23).
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
-
 use std::ffi::OsStr;
 
 use checker::CompositeChecker;
