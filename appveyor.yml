@@ -11,6 +11,11 @@ environment:
   - channel: stable
     target: i686-pc-windows-gnu
 install:
+  # Set PATH for MinGW toolset
+  - if %target% == x86_64-pc-windows-gnu set PATH=%PATH%;C:\msys64\mingw64\bin
+  - if %target% == i686-pc-windows-gnu set PATH=%PATH%;C:\msys64\mingw32\bin
+
+  # Install Rust toolset
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
