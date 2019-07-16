@@ -7,7 +7,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use tempdir::TempDir;
-use which::{which, which_in};
 
 struct TestFixture {
     /// Temp directory.
@@ -84,15 +83,15 @@ impl TestFixture {
     }
 }
 
-fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<PathBuf> {
-    which_in(path, Some(f.paths.clone()), f.tempdir.path())
+fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<which::CanonicalPath> {
+    which::CanonicalPath::new_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
 
 #[test]
 #[cfg(unix)]
 fn it_works() {
     use std::process::Command;
-    let result = which("rustc");
+    let result = which::Path::new("rustc");
     assert!(result.is_ok());
 
     let which_result = Command::new("which").arg("rustc").output();
@@ -109,20 +108,14 @@ fn it_works() {
 #[cfg(unix)]
 fn test_which() {
     let f = TestFixture::new();
-    assert_eq!(
-        _which(&f, &BIN_NAME).unwrap().canonicalize().unwrap(),
-        f.bins[0]
-    )
+    assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[0])
 }
 
 #[test]
 #[cfg(windows)]
 fn test_which() {
     let f = TestFixture::new();
-    assert_eq!(
-        _which(&f, &BIN_NAME).unwrap().canonicalize().unwrap(),
-        f.bins[1]
-    )
+    assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[1])
 }
 
 #[test]
@@ -130,7 +123,7 @@ fn test_which() {
 fn test_which_extension() {
     let f = TestFixture::new();
     let b = Path::new(&BIN_NAME).with_extension("");
-    assert_eq!(_which(&f, &b).unwrap().canonicalize().unwrap(), f.bins[0])
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[0])
 }
 
 #[test]
@@ -138,7 +131,7 @@ fn test_which_extension() {
 fn test_which_extension() {
     let f = TestFixture::new();
     let b = Path::new(&BIN_NAME).with_extension("cmd");
-    assert_eq!(_which(&f, &b).unwrap().canonicalize().unwrap(), f.bins[2])
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[2])
 }
 
 #[test]
@@ -151,7 +144,7 @@ fn test_which_not_found() {
 fn test_which_second() {
     let f = TestFixture::new();
     let b = f.mk_bin("b/another", env::consts::EXE_EXTENSION).unwrap();
-    assert_eq!(_which(&f, "another").unwrap().canonicalize().unwrap(), b);
+    assert_eq!(_which(&f, "another").unwrap(), b);
 }
 
 #[test]
@@ -159,7 +152,7 @@ fn test_which_second() {
 fn test_which_absolute() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, &f.bins[3]).unwrap().canonicalize().unwrap(),
+        _which(&f, &f.bins[3]).unwrap(),
         f.bins[3].canonicalize().unwrap()
     );
 }
@@ -169,7 +162,7 @@ fn test_which_absolute() {
 fn test_which_absolute() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, &f.bins[4]).unwrap().canonicalize().unwrap(),
+        _which(&f, &f.bins[4]).unwrap(),
         f.bins[4].canonicalize().unwrap()
     );
 }
@@ -181,10 +174,7 @@ fn test_which_absolute_path_case() {
     // is accepted.
     let f = TestFixture::new();
     let p = &f.bins[4];
-    assert_eq!(
-        _which(&f, &p).unwrap().canonicalize().unwrap(),
-        f.bins[4].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &p).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
@@ -193,10 +183,7 @@ fn test_which_absolute_extension() {
     let f = TestFixture::new();
     // Don't append EXE_EXTENSION here.
     let b = f.bins[3].parent().unwrap().join(&BIN_NAME);
-    assert_eq!(
-        _which(&f, &b).unwrap().canonicalize().unwrap(),
-        f.bins[3].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[3].canonicalize().unwrap());
 }
 
 #[test]
@@ -205,10 +192,7 @@ fn test_which_absolute_extension() {
     let f = TestFixture::new();
     // Don't append EXE_EXTENSION here.
     let b = f.bins[4].parent().unwrap().join(&BIN_NAME);
-    assert_eq!(
-        _which(&f, &b).unwrap().canonicalize().unwrap(),
-        f.bins[4].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
@@ -216,7 +200,7 @@ fn test_which_absolute_extension() {
 fn test_which_relative() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, "b/bin").unwrap().canonicalize().unwrap(),
+        _which(&f, "b/bin").unwrap(),
         f.bins[3].canonicalize().unwrap()
     );
 }
@@ -226,7 +210,7 @@ fn test_which_relative() {
 fn test_which_relative() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, "b/bin").unwrap().canonicalize().unwrap(),
+        _which(&f, "b/bin").unwrap(),
         f.bins[4].canonicalize().unwrap()
     );
 }
@@ -238,10 +222,7 @@ fn test_which_relative_extension() {
     // so test a relative path with an extension here.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension(env::consts::EXE_EXTENSION);
-    assert_eq!(
-        _which(&f, &b).unwrap().canonicalize().unwrap(),
-        f.bins[3].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[3].canonicalize().unwrap());
 }
 
 #[test]
@@ -251,10 +232,7 @@ fn test_which_relative_extension() {
     // so test a relative path with an extension here.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension("cmd");
-    assert_eq!(
-        _which(&f, &b).unwrap().canonicalize().unwrap(),
-        f.bins[5].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[5].canonicalize().unwrap());
 }
 
 #[test]
@@ -264,10 +242,7 @@ fn test_which_relative_extension_case() {
     // is accepted.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension("EXE");
-    assert_eq!(
-        _which(&f, &b).unwrap().canonicalize().unwrap(),
-        f.bins[4].canonicalize().unwrap()
-    );
+    assert_eq!(_which(&f, &b).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
@@ -275,7 +250,7 @@ fn test_which_relative_extension_case() {
 fn test_which_relative_leading_dot() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, "./b/bin").unwrap().canonicalize().unwrap(),
+        _which(&f, "./b/bin").unwrap(),
         f.bins[3].canonicalize().unwrap()
     );
 }
@@ -285,7 +260,7 @@ fn test_which_relative_leading_dot() {
 fn test_which_relative_leading_dot() {
     let f = TestFixture::new();
     assert_eq!(
-        _which(&f, "./b/bin").unwrap().canonicalize().unwrap(),
+        _which(&f, "./b/bin").unwrap(),
         f.bins[4].canonicalize().unwrap()
     );
 }
@@ -324,7 +299,7 @@ fn test_failure() {
     let run = || -> std::result::Result<PathBuf, failure::Error> {
         // Test the conversion to failure
         let p = _which(&f, "./b/bin")?;
-        Ok(p)
+        Ok(p.into_path_buf())
     };
 
     let _ = run();

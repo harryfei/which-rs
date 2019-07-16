@@ -15,6 +15,7 @@ pub enum ErrorKind {
     BadRelativePath,
     CannotFindBinaryPath,
     CannotGetCurrentDir,
+    CannotCanonicalize,
 }
 
 impl Fail for ErrorKind {}
@@ -26,6 +27,7 @@ impl Display for ErrorKind {
             ErrorKind::BadRelativePath => "Bad relative path",
             ErrorKind::CannotFindBinaryPath => "Cannot find binary path",
             ErrorKind::CannotGetCurrentDir => "Cannot get current directory",
+            ErrorKind::CannotCanonicalize => "Cannot canonicalize path",
         };
         f.write_str(display)
     }
