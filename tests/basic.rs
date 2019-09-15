@@ -293,6 +293,7 @@ fn test_which_relative_non_executable() {
 }
 
 #[test]
+#[cfg(feature = "use_failure")]
 fn test_failure() {
     let f = TestFixture::new();
 
