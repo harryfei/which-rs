@@ -17,6 +17,11 @@ libc = "0.2.10"
 version = "0.1.1"
 default-features = false
 features = ["std"]
+optional = true
 
 [dev-dependencies]
 tempdir = "0.3.4"
+
+[features]
+default = ["use_failure"]
+use_failure = ["failure"]
