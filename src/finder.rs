@@ -51,7 +51,7 @@ impl Finder {
         binary_name: T,
         paths: Option<U>,
         cwd: V,
-        binary_checker: &Checker,
+        binary_checker: &dyn Checker,
     ) -> Result<PathBuf>
     where
         T: AsRef<OsStr>,

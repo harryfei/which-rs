@@ -8,7 +8,7 @@ pub struct Error {
     #[cfg(feature = "use_failure")]
     inner: Context<ErrorKind>,
     #[cfg(not(feature = "use_failure"))]
-    inner: ErrorKind
+    inner: ErrorKind,
 }
 
 // To suppress false positives from cargo-clippy
@@ -40,7 +40,7 @@ impl Display for ErrorKind {
 
 #[cfg(feature = "use_failure")]
 impl Fail for Error {
-    fn cause(&self) -> Option<&Fail> {
+    fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
     }
 
@@ -58,9 +58,13 @@ impl Display for Error {
 impl Error {
     pub fn kind(&self) -> ErrorKind {
         #[cfg(feature = "use_failure")]
-            { *self.inner.get_context() }
+        {
+            *self.inner.get_context()
+        }
         #[cfg(not(feature = "use_failure"))]
-            { self.inner }
+        {
+            self.inner
+        }
     }
 }
 

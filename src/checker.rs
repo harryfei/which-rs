@@ -1,12 +1,12 @@
-use std::fs;
+use finder::Checker;
+#[cfg(unix)]
+use libc;
 #[cfg(unix)]
 use std::ffi::CString;
+use std::fs;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-#[cfg(unix)]
-use libc;
-use finder::Checker;
 
 pub struct ExecutableChecker;
 
@@ -47,7 +47,7 @@ impl Checker for ExistedChecker {
 }
 
 pub struct CompositeChecker {
-    checkers: Vec<Box<Checker>>,
+    checkers: Vec<Box<dyn Checker>>,
 }
 
 impl CompositeChecker {
@@ -57,7 +57,7 @@ impl CompositeChecker {
         }
     }
 
-    pub fn add_checker(mut self, checker: Box<Checker>) -> CompositeChecker {
+    pub fn add_checker(mut self, checker: Box<dyn Checker>) -> CompositeChecker {
         self.checkers.push(checker);
         self
     }
