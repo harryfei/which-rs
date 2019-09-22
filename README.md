@@ -13,7 +13,7 @@ A Rust equivalent of Unix command "which". Locate installed executable in cross 
 
 ## Example
 
-To find which rustc exectable binary is using. Locate installed executable in cross platforms.
+To find which rustc exectable binary is using.
 
 ``` rust
 use which::which;
