@@ -1,13 +1,13 @@
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 use failure::{Backtrace, Context, Fail};
 use std;
 use std::fmt::{self, Display};
 
 #[derive(Debug)]
 pub struct Error {
-    #[cfg(feature = "use_failure")]
+    #[cfg(feature = "failure")]
     inner: Context<ErrorKind>,
-    #[cfg(not(feature = "use_failure"))]
+    #[cfg(not(feature = "failure"))]
     inner: ErrorKind,
 }
 
@@ -22,7 +22,7 @@ pub enum ErrorKind {
     CannotCanonicalize,
 }
 
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 impl Fail for ErrorKind {}
 
 impl Display for ErrorKind {
@@ -38,7 +38,7 @@ impl Display for ErrorKind {
     }
 }
 
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 impl Fail for Error {
     fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
@@ -60,11 +60,11 @@ impl Display for Error {
 
 impl Error {
     pub fn kind(&self) -> ErrorKind {
-        #[cfg(feature = "use_failure")]
+        #[cfg(feature = "failure")]
         {
             *self.inner.get_context()
         }
-        #[cfg(not(feature = "use_failure"))]
+        #[cfg(not(feature = "failure"))]
         {
             self.inner
         }
@@ -74,15 +74,15 @@ impl Error {
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Error {
         Error {
-            #[cfg(feature = "use_failure")]
+            #[cfg(feature = "failure")]
             inner: Context::new(kind),
-            #[cfg(not(feature = "use_failure"))]
+            #[cfg(not(feature = "failure"))]
             inner: kind,
         }
     }
 }
 
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 impl From<Context<ErrorKind>> for Error {
     fn from(inner: Context<ErrorKind>) -> Error {
         Error { inner }

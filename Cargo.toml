@@ -23,5 +23,4 @@ optional = true
 tempdir = "0.3.4"
 
 [features]
-default = ["use_failure"]
-use_failure = ["failure"]
+default = ["failure"]
