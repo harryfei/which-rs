@@ -49,6 +49,9 @@ impl Fail for Error {
     }
 }
 
+#[cfg(not(feature = "failure"))]
+impl std::error::Error for Error {}
+
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Display::fmt(&self.inner, f)
