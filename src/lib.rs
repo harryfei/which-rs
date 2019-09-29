@@ -13,11 +13,11 @@
 //!
 //! ```
 
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 extern crate failure;
 extern crate libc;
 
-#[cfg(feature = "use_failure")]
+#[cfg(feature = "failure")]
 use failure::ResultExt;
 mod checker;
 mod error;
@@ -59,9 +59,9 @@ use finder::Finder;
 ///
 /// ```
 pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
-    #[cfg(feature = "use_failure")]
+    #[cfg(feature = "failure")]
     let cwd = env::current_dir().context(ErrorKind::CannotGetCurrentDir)?;
-    #[cfg(not(feature = "use_failure"))]
+    #[cfg(not(feature = "failure"))]
     let cwd = env::current_dir().map_err(|_| ErrorKind::CannotGetCurrentDir)?;
 
     which_in(binary_name, env::var_os("PATH"), &cwd)
