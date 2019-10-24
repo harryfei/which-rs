@@ -11,16 +11,16 @@ categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
 [dependencies]
-libc = "0.2.10"
+libc = "0.2.65"
 
 [dependencies.failure]
-version = "0.1.1"
+version = "0.1.6"
 default-features = false
 features = ["std"]
 optional = true
 
 [dev-dependencies]
-tempdir = "0.3.4"
+tempdir = "0.3.7"
 
 [features]
 default = ["failure"]
