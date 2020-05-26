@@ -293,12 +293,10 @@ fn test_which_relative_non_executable() {
 }
 
 #[test]
-#[cfg(feature = "failure")]
 fn test_failure() {
     let f = TestFixture::new();
 
-    let run = || -> std::result::Result<PathBuf, failure::Error> {
-        // Test the conversion to failure
+    let run = || -> which::Result<PathBuf> {
         let p = _which(&f, "./b/bin")?;
         Ok(p.into_path_buf())
     };
