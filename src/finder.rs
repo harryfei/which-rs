@@ -66,7 +66,7 @@ impl Finder {
             Box::new(candidates)
         } else {
             // Search binary in PATHs(defined in environment variable).
-            let p = paths.ok_or(ErrorKind::CannotFindBinaryPath)?;
+            let p = paths.ok_or(Error::CannotFindBinaryPath)?;
             let paths: Vec<_> = env::split_paths(&p).collect();
 
             let candidates = Self::path_search_candidates(path, paths).into_iter();
@@ -82,7 +82,7 @@ impl Finder {
         }
 
         // can't find any binary
-        return Err(ErrorKind::CannotFindBinaryPath.into());
+        return Err(Error::CannotFindBinaryPath.into());
     }
 
     fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>
