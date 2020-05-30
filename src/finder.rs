@@ -82,7 +82,7 @@ impl Finder {
         }
 
         // can't find any binary
-        return Err(Error::CannotFindBinaryPath.into());
+        Err(Error::CannotFindBinaryPath)
     }
 
     fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>

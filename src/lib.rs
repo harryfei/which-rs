@@ -188,10 +188,7 @@ impl CanonicalPath {
     /// This calls `which` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
     pub fn new<T: AsRef<OsStr>>(binary_name: T) -> Result<CanonicalPath> {
         which(binary_name)
-            .and_then(|p| {
-                p.canonicalize()
-                    .map_err(|_| Error::CannotCanonicalize.into())
-            })
+            .and_then(|p| p.canonicalize().map_err(|_| Error::CannotCanonicalize))
             .map(|inner| CanonicalPath { inner })
     }
 
@@ -206,10 +203,7 @@ impl CanonicalPath {
         V: AsRef<path::Path>,
     {
         which_in(binary_name, paths, cwd)
-            .and_then(|p| {
-                p.canonicalize()
-                    .map_err(|_| Error::CannotCanonicalize.into())
-            })
+            .and_then(|p| p.canonicalize().map_err(|_| Error::CannotCanonicalize))
             .map(|inner| CanonicalPath { inner })
     }
 
