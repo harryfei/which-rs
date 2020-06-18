@@ -40,7 +40,7 @@ impl ExistedChecker {
 
 impl Checker for ExistedChecker {
     fn is_valid(&self, path: &Path) -> bool {
-        fs::metadata(path)
+        fs::symlink_metadata(path)
             .map(|metadata| metadata.is_file())
             .unwrap_or(false)
     }
