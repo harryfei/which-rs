@@ -23,7 +23,7 @@ impl Checker for ExecutableChecker {
             .and_then(|c| Ok(unsafe { libc::access(c.as_ptr(), libc::X_OK) == 0 }))
             .unwrap_or(false)
     }
-    
+
     #[cfg(windows)]
     fn is_valid(&self, _path: &Path) -> bool {
         true
