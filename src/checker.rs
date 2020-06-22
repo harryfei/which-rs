@@ -39,6 +39,14 @@ impl ExistedChecker {
 }
 
 impl Checker for ExistedChecker {
+    #[cfg(target_os="windows")]
+    fn is_valid(&self, path: &Path) -> bool {
+        fs::symlink_metadata(path)
+            .map(|metadata| metadata.is_file())
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(target_os="windows"))]
     fn is_valid(&self, path: &Path) -> bool {
         fs::metadata(path)
             .map(|metadata| metadata.is_file())
