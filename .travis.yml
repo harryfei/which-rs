@@ -12,7 +12,7 @@ cache:
     - $HOME/.cargo
 
 script:
-  - rustup component add rustfmt --toolchain stable-x86_64-unknown-linux-gnu
+  - rustup component add rustfmt
   - cargo fmt --all -- --check
   - cargo build --all
   - cargo test

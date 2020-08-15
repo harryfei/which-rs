@@ -5,8 +5,9 @@
 //!
 //! To find which rustc executable binary is using:
 //!
-//! ``` norun
+//! ```no_run
 //! use which::which;
+//! use std::path::PathBuf;
 //!
 //! let result = which::which("rustc").unwrap();
 //! assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
@@ -47,7 +48,7 @@ use finder::Finder;
 ///
 /// # Example
 ///
-/// ``` norun
+/// ```no_run
 /// use which::which;
 /// use std::path::PathBuf;
 ///
