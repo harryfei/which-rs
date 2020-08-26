@@ -1,17 +1,26 @@
-use thiserror;
+use std::fmt;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(thiserror::Error, Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Error {
-    #[error("bad absolute path")]
     BadAbsolutePath,
-    #[error("bad relative path")]
     BadRelativePath,
-    #[error("cannot find binary path")]
     CannotFindBinaryPath,
-    #[error("cannot get current directory")]
     CannotGetCurrentDir,
-    #[error("cannot canonicalize path")]
     CannotCanonicalize,
+}
+
+impl std::error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::BadAbsolutePath => write!(f, "bad absolute path"),
+            Error::BadRelativePath => write!(f, "bad relative path"),
+            Error::CannotFindBinaryPath => write!(f, "cannot find binary path"),
+            Error::CannotGetCurrentDir => write!(f, "cannot get current directory"),
+            Error::CannotCanonicalize => write!(f, "cannot canonicalize path"),
+        }
+    }
 }
