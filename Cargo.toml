@@ -11,6 +11,7 @@ categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
 [dependencies]
+either = "1.6"
 libc = "0.2.65"
 thiserror = "1.0"
 

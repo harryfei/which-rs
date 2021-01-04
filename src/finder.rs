@@ -1,3 +1,4 @@
+use either::Either;
 use error::*;
 #[cfg(windows)]
 use helper::has_executable_extension;
@@ -7,6 +8,7 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::iter;
 use std::path::{Path, PathBuf};
+use checker::CompositeChecker;
 
 pub trait Checker {
     fn is_valid(&self, path: &Path) -> bool;
@@ -51,8 +53,8 @@ impl Finder {
         binary_name: T,
         paths: Option<U>,
         cwd: V,
-        binary_checker: &dyn Checker,
-    ) -> Result<PathBuf>
+        binary_checker: CompositeChecker,
+    ) -> Result<impl Iterator<Item = PathBuf>>
     where
         T: AsRef<OsStr>,
         U: AsRef<OsStr>,
@@ -60,29 +62,21 @@ impl Finder {
     {
         let path = PathBuf::from(&binary_name);
 
-        let binary_path_candidates: Box<dyn Iterator<Item = _>> = if path.has_separator() {
+        let binary_path_candidates = if path.has_separator() {
             // Search binary in cwd if the path have a path separator.
-            let candidates = Self::cwd_search_candidates(path, cwd).into_iter();
-            Box::new(candidates)
+            Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
         } else {
             // Search binary in PATHs(defined in environment variable).
             let p = paths.ok_or(Error::CannotFindBinaryPath)?;
             let paths: Vec<_> = env::split_paths(&p).collect();
 
-            let candidates = Self::path_search_candidates(path, paths).into_iter();
-
-            Box::new(candidates)
+            Either::Right(Self::path_search_candidates(path, paths).into_iter())
         };
 
-        for p in binary_path_candidates {
-            // find a valid binary
-            if binary_checker.is_valid(&p) {
-                return Ok(p);
-            }
-        }
-
-        // can't find any binary
-        Err(Error::CannotFindBinaryPath)
+        Ok(
+            binary_path_candidates
+                .filter(move |p| binary_checker.is_valid(p))
+        )
     }
 
     fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>
