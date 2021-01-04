@@ -1,3 +1,4 @@
+use either::Either;
 use error::*;
 #[cfg(windows)]
 use helper::has_executable_extension;
@@ -60,18 +61,15 @@ impl Finder {
     {
         let path = PathBuf::from(&binary_name);
 
-        let binary_path_candidates: Box<dyn Iterator<Item = _>> = if path.has_separator() {
+        let binary_path_candidates = if path.has_separator() {
             // Search binary in cwd if the path have a path separator.
-            let candidates = Self::cwd_search_candidates(path, cwd).into_iter();
-            Box::new(candidates)
+            Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
         } else {
             // Search binary in PATHs(defined in environment variable).
             let p = paths.ok_or(Error::CannotFindBinaryPath)?;
             let paths: Vec<_> = env::split_paths(&p).collect();
 
-            let candidates = Self::path_search_candidates(path, paths).into_iter();
-
-            Box::new(candidates)
+            Either::Right(Self::path_search_candidates(path, paths).into_iter())
         };
 
         for p in binary_path_candidates {

@@ -14,6 +14,7 @@
 //!
 //! ```
 
+extern crate either;
 extern crate libc;
 extern crate thiserror;
 
