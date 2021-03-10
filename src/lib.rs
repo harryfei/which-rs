@@ -16,7 +16,6 @@
 
 extern crate either;
 extern crate libc;
-extern crate thiserror;
 
 mod checker;
 mod error;
