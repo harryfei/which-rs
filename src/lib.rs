@@ -61,7 +61,7 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
-pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item=path::PathBuf>> {
+pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
     let cwd = env::current_dir().map_err(|_| Error::CannotGetCurrentDir)?;
 
     which_in_all(binary_name, env::var_os("PATH"), cwd)
@@ -74,11 +74,16 @@ where
     U: AsRef<OsStr>,
     V: AsRef<path::Path>,
 {
-    which_in_all(binary_name, paths, cwd).and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
+    which_in_all(binary_name, paths, cwd)
+        .and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
-pub fn which_in_all<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<impl Iterator<Item=path::PathBuf>>
+pub fn which_in_all<T, U, V>(
+    binary_name: T,
+    paths: Option<U>,
+    cwd: V,
+) -> Result<impl Iterator<Item = path::PathBuf>>
 where
     T: AsRef<OsStr>,
     U: AsRef<OsStr>,
@@ -119,7 +124,7 @@ impl Path {
     /// Returns the paths of all executable binaries by a name.
     ///
     /// this calls `which_all` and maps the results into `Path`s.
-    pub fn all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item=Path>> {
+    pub fn all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = Path>> {
         which_all(binary_name).map(|inner| inner.map(|inner| Path { inner }))
     }
 
@@ -140,11 +145,15 @@ impl Path {
     /// current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and maps the results into a `Path`.
-    pub fn all_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<impl Iterator<Item=Path>>
-        where
-            T: AsRef<OsStr>,
-            U: AsRef<OsStr>,
-            V: AsRef<path::Path>,
+    pub fn all_in<T, U, V>(
+        binary_name: T,
+        paths: Option<U>,
+        cwd: V,
+    ) -> Result<impl Iterator<Item = Path>>
+    where
+        T: AsRef<OsStr>,
+        U: AsRef<OsStr>,
+        V: AsRef<path::Path>,
     {
         which_in_all(binary_name, paths, cwd).map(|inner| inner.map(|inner| Path { inner }))
     }
@@ -231,12 +240,17 @@ impl CanonicalPath {
     /// Returns the canonical paths of an executable binary by name.
     ///
     /// This calls `which_all` and `Path::canonicalize` and maps the results into `CanonicalPath`s.
-    pub fn all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item=Result<CanonicalPath>>> {
-        which_all(binary_name)
-            .map(|inner| inner.map(|inner|
-                inner.canonicalize().map_err(|_| Error::CannotCanonicalize)
-                .map(|inner| CanonicalPath { inner })
-            ))
+    pub fn all<T: AsRef<OsStr>>(
+        binary_name: T,
+    ) -> Result<impl Iterator<Item = Result<CanonicalPath>>> {
+        which_all(binary_name).map(|inner| {
+            inner.map(|inner| {
+                inner
+                    .canonicalize()
+                    .map_err(|_| Error::CannotCanonicalize)
+                    .map(|inner| CanonicalPath { inner })
+            })
+        })
     }
 
     /// Returns the canonical path of an executable binary by name in the path list `paths` and
@@ -258,17 +272,24 @@ impl CanonicalPath {
     /// using the current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
-    pub fn all_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<impl Iterator<Item=Result<CanonicalPath>>>
-        where
-            T: AsRef<OsStr>,
-            U: AsRef<OsStr>,
-            V: AsRef<path::Path>,
+    pub fn all_in<T, U, V>(
+        binary_name: T,
+        paths: Option<U>,
+        cwd: V,
+    ) -> Result<impl Iterator<Item = Result<CanonicalPath>>>
+    where
+        T: AsRef<OsStr>,
+        U: AsRef<OsStr>,
+        V: AsRef<path::Path>,
     {
-        which_in_all(binary_name, paths, cwd)
-            .map(|inner| inner.map(|inner|
-                inner.canonicalize().map_err(|_| Error::CannotCanonicalize)
+        which_in_all(binary_name, paths, cwd).map(|inner| {
+            inner.map(|inner| {
+                inner
+                    .canonicalize()
+                    .map_err(|_| Error::CannotCanonicalize)
                     .map(|inner| CanonicalPath { inner })
-            ))
+            })
+        })
     }
 
     /// Returns a reference to a `std::path::Path`.

@@ -87,7 +87,10 @@ fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<which::Can
     which::CanonicalPath::new_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
 
-fn _which_all<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<impl Iterator<Item=which::Result<which::CanonicalPath>>> {
+fn _which_all<T: AsRef<OsStr>>(
+    f: &TestFixture,
+    path: T,
+) -> which::Result<impl Iterator<Item = which::Result<which::CanonicalPath>>> {
     which::CanonicalPath::all_in(path, Some(f.paths.clone()), f.tempdir.path().to_path_buf())
 }
 
@@ -154,12 +157,21 @@ fn test_which_second() {
 #[test]
 fn test_which_all() {
     let f = TestFixture::new();
-    let actual = _which_all(&f, BIN_NAME).unwrap().map(|c| c.unwrap()).collect::<Vec<_>>();
-    let mut expected = f.bins.iter().map(|p| p.canonicalize().unwrap()).collect::<Vec<_>>();
-    #[cfg(windows)] {
+    let actual = _which_all(&f, BIN_NAME)
+        .unwrap()
+        .map(|c| c.unwrap())
+        .collect::<Vec<_>>();
+    let mut expected = f
+        .bins
+        .iter()
+        .map(|p| p.canonicalize().unwrap())
+        .collect::<Vec<_>>();
+    #[cfg(windows)]
+    {
         expected.retain(|p| p.extension().map(|ext| ext == "exe" || ext == "cmd") == Some(true));
     }
-    #[cfg(not(windows))] {
+    #[cfg(not(windows))]
+    {
         expected.retain(|p| p.file_name().unwrap() == BIN_NAME);
     }
     assert_eq!(actual, expected);

@@ -1,3 +1,4 @@
+use checker::CompositeChecker;
 use either::Either;
 use error::*;
 #[cfg(windows)]
@@ -8,7 +9,6 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::iter;
 use std::path::{Path, PathBuf};
-use checker::CompositeChecker;
 
 pub trait Checker {
     fn is_valid(&self, path: &Path) -> bool;
@@ -73,10 +73,7 @@ impl Finder {
             Either::Right(Self::path_search_candidates(path, paths).into_iter())
         };
 
-        Ok(
-            binary_path_candidates
-                .filter(move |p| binary_checker.is_valid(p))
-        )
+        Ok(binary_path_candidates.filter(move |p| binary_checker.is_valid(p)))
     }
 
     fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>
