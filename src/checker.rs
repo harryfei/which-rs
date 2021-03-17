@@ -1,4 +1,4 @@
-use finder::Checker;
+use crate::finder::Checker;
 #[cfg(unix)]
 use libc;
 #[cfg(unix)]

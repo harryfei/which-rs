@@ -14,9 +14,6 @@
 //!
 //! ```
 
-extern crate either;
-extern crate libc;
-
 mod checker;
 mod error;
 mod finder;
@@ -29,11 +26,9 @@ use std::path;
 
 use std::ffi::OsStr;
 
-use checker::CompositeChecker;
-use checker::ExecutableChecker;
-use checker::ExistedChecker;
-pub use error::*;
-use finder::Finder;
+use crate::checker::{CompositeChecker, ExecutableChecker, ExistedChecker};
+pub use crate::error::*;
+use crate::finder::Finder;
 
 /// Find a exectable binary's path by name.
 ///

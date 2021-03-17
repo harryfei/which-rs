@@ -1,8 +1,8 @@
-use checker::CompositeChecker;
+use crate::checker::CompositeChecker;
+use crate::error::*;
 use either::Either;
-use error::*;
 #[cfg(windows)]
-use helper::has_executable_extension;
+use crate::helper::has_executable_extension;
 use std::env;
 use std::ffi::OsStr;
 #[cfg(windows)]
