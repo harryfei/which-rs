@@ -1,16 +1,11 @@
 name: Rust
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-
   test:
     name: Build and test
     runs-on: ${{ matrix.os }}
@@ -18,11 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         os:
-        - ubuntu-latest
-        - windows-latest
-        - macos-latest
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - run: cargo build --verbose
-    - run: cargo test --verbose
+      - uses: actions/checkout@v2
+      - run: cargo build --verbose
+      - run: cargo test --verbose
