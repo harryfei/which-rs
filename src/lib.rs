@@ -24,6 +24,8 @@ mod finder;
 #[cfg(windows)]
 mod helper;
 
+#[cfg(feature = "regex")]
+use regex::Regex;
 use std::env;
 use std::fmt;
 use std::path;
@@ -66,6 +68,29 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
     which_in_all(binary_name, env::var_os("PATH"), cwd)
 }
 
+/// Find all binaries matching a regular expression in a the system PATH.
+///
+/// # Arguments
+///
+/// * `regex` - A regular expression to match binaries with
+///
+/// # Examples
+///
+/// ```no_run
+/// use regex::Regex;
+/// use which::which;
+/// use std::path::PathBuf;
+///
+/// let re = Regex::new(r"python\d$").unwrap();
+/// let binaries: Vec<PathBuf> = which::which_re(re).unwrap().collect();
+/// let python_paths = vec![PathBuf::from("/usr/bin/python2"), PathBuf::from("/usr/bin/python3")];
+/// assert_eq!(binaries, python_paths);
+/// ```
+#[cfg(feature = "regex")]
+pub fn which_re(regex: Regex) -> Result<impl Iterator<Item = path::PathBuf>> {
+    which_re_in(regex, env::var_os("PATH"))
+}
+
 /// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
 pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<path::PathBuf>
 where
@@ -75,6 +100,41 @@ where
 {
     which_in_all(binary_name, paths, cwd)
         .and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
+}
+
+/// Find all binaries matching a regular expression in a list of paths.
+///
+/// # Arguments
+///
+/// * `regex` - A regular expression to match binaries with
+/// * `paths` - A string containing the paths to search
+///             (separated in the same way as the PATH environment variable)
+///
+/// # Examples
+///
+/// ```no_run
+/// use regex::Regex;
+/// use which::which;
+/// use std::path::PathBuf;
+///
+/// let re = Regex::new(r"python\d$").unwrap();
+/// let paths = Some("/usr/bin:/usr/local/bin");
+/// let binaries: Vec<PathBuf> = which::which_re_in(re, paths).unwrap().collect();
+/// let python_paths = vec![PathBuf::from("/usr/bin/python2"), PathBuf::from("/usr/bin/python3")];
+/// assert_eq!(binaries, python_paths);
+/// ```
+#[cfg(feature = "regex")]
+pub fn which_re_in<T>(regex: Regex, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
+where
+    T: AsRef<OsStr>,
+{
+    let binary_checker = CompositeChecker::new()
+        .add_checker(Box::new(ExistedChecker::new()))
+        .add_checker(Box::new(ExecutableChecker::new()));
+
+    let finder = Finder::new();
+
+    finder.find_re(regex, paths, binary_checker)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.

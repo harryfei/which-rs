@@ -1,10 +1,13 @@
 use crate::checker::CompositeChecker;
 use crate::error::*;
-use either::Either;
 #[cfg(windows)]
 use crate::helper::has_executable_extension;
+use either::Either;
+#[cfg(feature = "regex")]
+use regex::Regex;
 use std::env;
 use std::ffi::OsStr;
+use std::fs;
 use std::iter;
 use std::path::{Path, PathBuf};
 
@@ -72,6 +75,37 @@ impl Finder {
         };
 
         Ok(binary_path_candidates.filter(move |p| binary_checker.is_valid(p)))
+    }
+
+    #[cfg(feature = "regex")]
+    pub fn find_re<T>(
+        &self,
+        binary_regex: Regex,
+        paths: Option<T>,
+        binary_checker: CompositeChecker,
+    ) -> Result<impl Iterator<Item = PathBuf>>
+    where
+        T: AsRef<OsStr>,
+    {
+        let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+        let paths: Vec<_> = env::split_paths(&p).collect();
+
+        let matching_re = paths
+            .into_iter()
+            .flat_map(fs::read_dir)
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(move |p| {
+                if let Some(unicode_file_name) = p.file_name().unwrap().to_str() {
+                    binary_regex.is_match(unicode_file_name)
+                } else {
+                    false
+                }
+            })
+            .filter(move |p| binary_checker.is_valid(p));
+
+        Ok(matching_re)
     }
 
     fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>
