@@ -1,11 +1,13 @@
 extern crate tempdir;
 extern crate which;
 
-use std::env;
+#[cfg(feature = "regex")]
+use regex::Regex;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::{env, vec};
 use tempdir::TempDir;
 
 struct TestFixture {
@@ -123,6 +125,38 @@ fn test_which() {
 fn test_which() {
     let f = TestFixture::new();
     assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[1])
+}
+
+#[test]
+#[cfg(all(unix, feature = "regex"))]
+fn test_which_re_in_with_matches() {
+    let f = TestFixture::new();
+    f.mk_bin("a/bin_0", "").unwrap();
+    f.mk_bin("b/bin_1", "").unwrap();
+    let re = Regex::new(r"bin_\d").unwrap();
+
+    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths))
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    let temp = f.tempdir;
+    
+    assert_eq!(result, vec![temp.path().join("a/bin_0"), temp.path().join("b/bin_1")])
+}
+
+#[test]
+#[cfg(all(unix, feature = "regex"))]
+fn test_which_re_in_without_matches() {
+    let f = TestFixture::new();
+    let re = Regex::new(r"bi[^n]").unwrap();
+
+    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths))
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(result, Vec::<PathBuf>::new())
 }
 
 #[test]
