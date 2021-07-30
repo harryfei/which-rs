@@ -7,6 +7,8 @@ use either::Either;
 use regex::Regex;
 use std::env;
 use std::ffi::OsStr;
+#[cfg(feature = "regex")]
+use std::fs;
 use std::iter;
 use std::path::{Path, PathBuf};
 
