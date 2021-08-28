@@ -46,7 +46,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --workspace --locked --all-targets --all-features
+          args: --workspace --all-targets --all-features
 
   # Ensure that the project could be successfully compiled
   cargo_check:
@@ -64,7 +64,7 @@ jobs:
           override: true
 
       - name: Build | Check
-        run: cargo check --workspace --locked
+        run: cargo check --workspace
 
   # Run tests on Linux, macOS, and Windows
   # On both Rust stable and Rust nightly
@@ -94,4 +94,4 @@ jobs:
 
       # Run the ignored tests that expect the above setup
       - name: Build | Test
-        run: cargo test --workspace --locked --all-features -- -Z unstable-options --include-ignored
+        run: cargo test --workspace --all-features -- -Z unstable-options --include-ignored
