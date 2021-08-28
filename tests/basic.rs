@@ -141,8 +141,11 @@ fn test_which_re_in_with_matches() {
         .collect();
 
     let temp = f.tempdir;
-    
-    assert_eq!(result, vec![temp.path().join("a/bin_0"), temp.path().join("b/bin_1")])
+
+    assert_eq!(
+        result,
+        vec![temp.path().join("a/bin_0"), temp.path().join("b/bin_1")]
+    )
 }
 
 #[test]
