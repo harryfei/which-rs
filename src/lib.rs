@@ -26,6 +26,8 @@ mod helper;
 
 #[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(feature = "regex")]
+use std::borrow::Borrow;
 use std::env;
 use std::fmt;
 use std::path;
@@ -87,7 +89,7 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
 /// assert_eq!(binaries, python_paths);
 /// ```
 #[cfg(feature = "regex")]
-pub fn which_re(regex: Regex) -> Result<impl Iterator<Item = path::PathBuf>> {
+pub fn which_re(regex: impl Borrow<Regex>) -> Result<impl Iterator<Item = path::PathBuf>> {
     which_re_in(regex, env::var_os("PATH"))
 }
 
@@ -124,7 +126,7 @@ where
 /// assert_eq!(binaries, python_paths);
 /// ```
 #[cfg(feature = "regex")]
-pub fn which_re_in<T>(regex: Regex, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
+pub fn which_re_in<T>(regex: impl Borrow<Regex>, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
 where
     T: AsRef<OsStr>,
 {

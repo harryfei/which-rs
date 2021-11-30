@@ -163,6 +163,15 @@ fn test_which_re_in_without_matches() {
 }
 
 #[test]
+#[cfg(all(unix, feature = "regex"))]
+fn test_which_re_accepts_owned_and_borrow() {
+    which::which_re(Regex::new(r".").unwrap());
+    which::which_re(&Regex::new(r".").unwrap());
+    which::which_re_in(Regex::new(r".").unwrap(), Some("pth"));
+    which::which_re_in(&Regex::new(r".").unwrap(), Some("pth"));
+}
+
+#[test]
 #[cfg(unix)]
 fn test_which_extension() {
     let f = TestFixture::new();
