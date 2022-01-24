@@ -9,7 +9,7 @@
 //! use which::which;
 //! use std::path::PathBuf;
 //!
-//! let result = which::which("rustc").unwrap();
+//! let result = which("rustc").unwrap();
 //! assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
 //!
 //! ```
@@ -26,6 +26,8 @@ mod helper;
 
 #[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(feature = "regex")]
+use std::borrow::Borrow;
 use std::env;
 use std::fmt;
 use std::path;
@@ -70,11 +72,15 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
 
 /// Find all binaries matching a regular expression in a the system PATH.
 ///
+/// Only available when feature `regex` is enabled.
+///
 /// # Arguments
 ///
 /// * `regex` - A regular expression to match binaries with
 ///
 /// # Examples
+///
+/// Find Python executables:
 ///
 /// ```no_run
 /// use regex::Regex;
@@ -86,8 +92,18 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
 /// let python_paths = vec![PathBuf::from("/usr/bin/python2"), PathBuf::from("/usr/bin/python3")];
 /// assert_eq!(binaries, python_paths);
 /// ```
+///
+/// Find all cargo subcommand executables on the path:
+///
+/// ```
+/// use which::which_re;
+/// use regex::Regex;
+///
+/// which_re(Regex::new("^cargo-.*").unwrap()).unwrap()
+///     .for_each(|pth| println!("{}", pth.to_string_lossy()));
+/// ```
 #[cfg(feature = "regex")]
-pub fn which_re(regex: Regex) -> Result<impl Iterator<Item = path::PathBuf>> {
+pub fn which_re(regex: impl Borrow<Regex>) -> Result<impl Iterator<Item = path::PathBuf>> {
     which_re_in(regex, env::var_os("PATH"))
 }
 
@@ -103,6 +119,8 @@ where
 }
 
 /// Find all binaries matching a regular expression in a list of paths.
+///
+/// Only available when feature `regex` is enabled.
 ///
 /// # Arguments
 ///
@@ -124,7 +142,7 @@ where
 /// assert_eq!(binaries, python_paths);
 /// ```
 #[cfg(feature = "regex")]
-pub fn which_re_in<T>(regex: Regex, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
+pub fn which_re_in<T>(regex: impl Borrow<Regex>, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
 where
     T: AsRef<OsStr>,
 {

@@ -5,6 +5,8 @@ use crate::helper::has_executable_extension;
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(feature = "regex")]
+use std::borrow::Borrow;
 use std::env;
 use std::ffi::OsStr;
 #[cfg(feature = "regex")]
@@ -81,7 +83,7 @@ impl Finder {
     #[cfg(feature = "regex")]
     pub fn find_re<T>(
         &self,
-        binary_regex: Regex,
+        binary_regex: impl Borrow<Regex>,
         paths: Option<T>,
         binary_checker: CompositeChecker,
     ) -> Result<impl Iterator<Item = PathBuf>>
@@ -99,7 +101,7 @@ impl Finder {
             .map(|e| e.path())
             .filter(move |p| {
                 if let Some(unicode_file_name) = p.file_name().unwrap().to_str() {
-                    binary_regex.is_match(unicode_file_name)
+                    binary_regex.borrow().is_match(unicode_file_name)
                 } else {
                     false
                 }
