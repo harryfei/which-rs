@@ -158,7 +158,7 @@ impl Finder {
                     .map(|pathext| {
                         pathext.split(';')
                             .filter_map(|s| {
-                                if s.as_bytes().first() == Some(b'.') {
+                                if s.as_bytes().first() == Some(&b'.') {
                                     Some(s.to_owned())
                                 } else {
                                     // Invalid segment; just ignore it.
