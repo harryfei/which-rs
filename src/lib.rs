@@ -142,7 +142,10 @@ where
 /// assert_eq!(binaries, python_paths);
 /// ```
 #[cfg(feature = "regex")]
-pub fn which_re_in<T>(regex: impl Borrow<Regex>, paths: Option<T>) -> Result<impl Iterator<Item = path::PathBuf>>
+pub fn which_re_in<T>(
+    regex: impl Borrow<Regex>,
+    paths: Option<T>,
+) -> Result<impl Iterator<Item = path::PathBuf>>
 where
     T: AsRef<OsStr>,
 {
