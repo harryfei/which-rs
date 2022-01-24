@@ -75,12 +75,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest]
         rust: [stable, nightly]
     steps:
       - name: Setup | Checkout
         uses: actions/checkout@v2
-        
+
       - name: Setup | Rust
         uses: actions-rs/toolchain@v1
         with:
