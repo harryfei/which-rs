@@ -65,9 +65,13 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
 pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
-    let cwd = env::current_dir().map_err(|_| Error::CannotGetCurrentDir)?;
+    let cwd = env::current_dir().ok();
 
-    which_in_all(binary_name, env::var_os("PATH"), cwd)
+    let binary_checker = build_binary_checker();
+
+    let finder = Finder::new();
+
+    finder.find(binary_name, env::var_os("PATH"), cwd, binary_checker)
 }
 
 /// Find all binaries matching a regular expression in a the system PATH.
@@ -149,9 +153,7 @@ pub fn which_re_in<T>(
 where
     T: AsRef<OsStr>,
 {
-    let binary_checker = CompositeChecker::new()
-        .add_checker(Box::new(ExistedChecker::new()))
-        .add_checker(Box::new(ExecutableChecker::new()));
+    let binary_checker = build_binary_checker();
 
     let finder = Finder::new();
 
@@ -169,13 +171,17 @@ where
     U: AsRef<OsStr>,
     V: AsRef<path::Path>,
 {
-    let binary_checker = CompositeChecker::new()
-        .add_checker(Box::new(ExistedChecker::new()))
-        .add_checker(Box::new(ExecutableChecker::new()));
+    let binary_checker = build_binary_checker();
 
     let finder = Finder::new();
 
-    finder.find(binary_name, paths, cwd, binary_checker)
+    finder.find(binary_name, paths, Some(cwd), binary_checker)
+}
+
+fn build_binary_checker() -> CompositeChecker {
+    CompositeChecker::new()
+        .add_checker(Box::new(ExistedChecker::new()))
+        .add_checker(Box::new(ExecutableChecker::new()))
 }
 
 /// An owned, immutable wrapper around a `PathBuf` containing the path of an executable.

@@ -56,7 +56,7 @@ impl Finder {
         &self,
         binary_name: T,
         paths: Option<U>,
-        cwd: V,
+        cwd: Option<V>,
         binary_checker: CompositeChecker,
     ) -> Result<impl Iterator<Item = PathBuf>>
     where
@@ -66,15 +66,18 @@ impl Finder {
     {
         let path = PathBuf::from(&binary_name);
 
-        let binary_path_candidates = if path.has_separator() {
-            // Search binary in cwd if the path have a path separator.
-            Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
-        } else {
-            // Search binary in PATHs(defined in environment variable).
-            let p = paths.ok_or(Error::CannotFindBinaryPath)?;
-            let paths: Vec<_> = env::split_paths(&p).collect();
+        let binary_path_candidates = match cwd {
+            Some(cwd) if path.has_separator() => {
+                // Search binary in cwd if the path have a path separator.
+                Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
+            }
+            _ => {
+                // Search binary in PATHs(defined in environment variable).
+                let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+                let paths: Vec<_> = env::split_paths(&p).collect();
 
-            Either::Right(Self::path_search_candidates(path, paths).into_iter())
+                Either::Right(Self::path_search_candidates(path, paths).into_iter())
+            }
         };
 
         Ok(binary_path_candidates.filter(move |p| binary_checker.is_valid(p)))
