@@ -1,7 +1,7 @@
 extern crate tempdir;
 extern crate which;
 
-#[cfg(feature = "regex")]
+#[cfg(all(unix, feature = "regex"))]
 use regex::Regex;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -19,8 +19,8 @@ struct TestFixture {
     pub bins: Vec<PathBuf>,
 }
 
-const SUBDIRS: &'static [&'static str] = &["a", "b", "c"];
-const BIN_NAME: &'static str = "bin";
+const SUBDIRS: &[&str] = &["a", "b", "c"];
+const BIN_NAME: &str = "bin";
 
 #[cfg(unix)]
 fn mk_bin(dir: &Path, path: &str, extension: &str) -> io::Result<PathBuf> {
@@ -63,25 +63,25 @@ impl TestFixture {
         for d in SUBDIRS.iter() {
             let p = tempdir.path().join(d);
             builder.create(&p).unwrap();
-            bins.push(mk_bin(&p, &BIN_NAME, "").unwrap());
-            bins.push(mk_bin(&p, &BIN_NAME, "exe").unwrap());
-            bins.push(mk_bin(&p, &BIN_NAME, "cmd").unwrap());
+            bins.push(mk_bin(&p, BIN_NAME, "").unwrap());
+            bins.push(mk_bin(&p, BIN_NAME, "exe").unwrap());
+            bins.push(mk_bin(&p, BIN_NAME, "cmd").unwrap());
             paths.push(p);
         }
         TestFixture {
-            tempdir: tempdir,
+            tempdir,
             paths: env::join_paths(paths).unwrap(),
-            bins: bins,
+            bins,
         }
     }
 
     #[allow(dead_code)]
     pub fn touch(&self, path: &str, extension: &str) -> io::Result<PathBuf> {
-        touch(self.tempdir.path(), &path, &extension)
+        touch(self.tempdir.path(), path, extension)
     }
 
     pub fn mk_bin(&self, path: &str, extension: &str) -> io::Result<PathBuf> {
-        mk_bin(self.tempdir.path(), &path, &extension)
+        mk_bin(self.tempdir.path(), path, extension)
     }
 }
 
@@ -165,10 +165,18 @@ fn test_which_re_in_without_matches() {
 #[test]
 #[cfg(all(unix, feature = "regex"))]
 fn test_which_re_accepts_owned_and_borrow() {
-    which::which_re(Regex::new(r".").unwrap());
-    which::which_re(&Regex::new(r".").unwrap());
-    which::which_re_in(Regex::new(r".").unwrap(), Some("pth"));
-    which::which_re_in(&Regex::new(r".").unwrap(), Some("pth"));
+    which::which_re(Regex::new(r".").unwrap())
+        .unwrap()
+        .for_each(drop);
+    which::which_re(&Regex::new(r".").unwrap())
+        .unwrap()
+        .for_each(drop);
+    which::which_re_in(Regex::new(r".").unwrap(), Some("pth"))
+        .unwrap()
+        .for_each(drop);
+    which::which_re_in(&Regex::new(r".").unwrap(), Some("pth"))
+        .unwrap()
+        .for_each(drop);
 }
 
 #[test]
