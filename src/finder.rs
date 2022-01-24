@@ -94,6 +94,9 @@ impl Finder {
         T: AsRef<OsStr>,
     {
         let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+        // Collect needs to happen in order to not have to
+        // change the API to borrow on `paths`.
+        #[allow(clippy::needless_collect)]
         let paths: Vec<_> = env::split_paths(&p).collect();
 
         let matching_re = paths
@@ -169,7 +172,7 @@ impl Finder {
                     })
                     // PATHEXT not being set or not being a proper Unicode string is exceedingly
                     // improbable and would probably break Windows badly. Still, don't crash:
-                    .unwrap_or(vec![]);
+                    .unwrap_or_default();
         }
 
         paths
