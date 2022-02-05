@@ -12,12 +12,12 @@ categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
 [dependencies]
-either = "1.6"
-libc = "0.2.65"
+either = "1.6.1"
+libc = "0.2.117"
 regex = { version = "1.5.4", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-lazy_static = "1"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 tempfile = "3"
