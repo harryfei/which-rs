@@ -21,7 +21,6 @@ extern crate lazy_static;
 mod checker;
 mod error;
 mod finder;
-#[cfg(windows)]
 mod helper;
 
 #[cfg(feature = "regex")]

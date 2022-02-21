@@ -1,7 +1,6 @@
 use crate::checker::CompositeChecker;
 use crate::error::*;
-#[cfg(windows)]
-use crate::helper::has_executable_extension;
+use crate::helper::PathExt;
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
@@ -16,33 +15,6 @@ use std::path::{Path, PathBuf};
 
 pub trait Checker {
     fn is_valid(&self, path: &Path) -> bool;
-}
-
-trait PathExt {
-    fn has_separator(&self) -> bool;
-
-    fn to_absolute<P>(self, cwd: P) -> PathBuf
-    where
-        P: AsRef<Path>;
-}
-
-impl PathExt for PathBuf {
-    fn has_separator(&self) -> bool {
-        self.components().count() > 1
-    }
-
-    fn to_absolute<P>(self, cwd: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
-        if self.is_absolute() {
-            self
-        } else {
-            let mut new_path = PathBuf::from(cwd.as_ref());
-            new_path.push(self);
-            new_path
-        }
-    }
 }
 
 pub struct Finder;
@@ -179,7 +151,7 @@ impl Finder {
             .into_iter()
             .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
                 // Check if path already have executable extension
-                if has_executable_extension(&p, &PATH_EXTENSIONS) {
+                if p.has_executable_extension(&PATH_EXTENSIONS) {
                     Box::new(iter::once(p))
                 } else {
                     // Appended paths with windows executable extensions.
