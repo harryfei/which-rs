@@ -88,11 +88,11 @@ fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<which::Can
     which::CanonicalPath::new_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
 
-fn _which_all<T: AsRef<OsStr>>(
-    f: &TestFixture,
+fn _which_all<'a, T: AsRef<OsStr> + 'a>(
+    f: &'a TestFixture,
     path: T,
-) -> which::Result<impl Iterator<Item = which::Result<which::CanonicalPath>>> {
-    which::CanonicalPath::all_in(path, Some(f.paths.clone()), f.tempdir.path().to_path_buf())
+) -> which::Result<impl Iterator<Item = which::Result<which::CanonicalPath>> + '_> {
+    which::CanonicalPath::all_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
 
 #[test]
