@@ -151,29 +151,31 @@ impl Finder {
     where
         P: IntoIterator<Item = PathBuf>,
     {
+        use once_cell::sync::Lazy;
+
         // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
         // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
         // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
         // hence its retention.)
-        lazy_static! {
-            static ref PATH_EXTENSIONS: Vec<String> =
-                env::var("PATHEXT")
-                    .map(|pathext| {
-                        pathext.split(';')
-                            .filter_map(|s| {
-                                if s.as_bytes().first() == Some(&b'.') {
-                                    Some(s.to_owned())
-                                } else {
-                                    // Invalid segment; just ignore it.
-                                    None
-                                }
-                            })
-                            .collect()
-                    })
-                    // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                    // improbable and would probably break Windows badly. Still, don't crash:
-                    .unwrap_or_default();
-        }
+        static PATH_EXTENSIONS: Lazy<Vec<String>> = Lazy::new(|| {
+            env::var("PATHEXT")
+                .map(|pathext| {
+                    pathext
+                        .split(';')
+                        .filter_map(|s| {
+                            if s.as_bytes().first() == Some(&b'.') {
+                                Some(s.to_owned())
+                            } else {
+                                // Invalid segment; just ignore it.
+                                None
+                            }
+                        })
+                        .collect()
+                })
+                // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                // improbable and would probably break Windows badly. Still, don't crash:
+                .unwrap_or_default()
+        });
 
         paths
             .into_iter()
