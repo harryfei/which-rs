@@ -67,6 +67,10 @@ impl TestFixture {
             bins.push(mk_bin(&p, BIN_NAME, "cmd").unwrap());
             paths.push(p);
         }
+        let p = tempdir.path().join("win-bin");
+        builder.create(&p).unwrap();
+        bins.push(mk_bin(&p, "win-bin", "exe").unwrap());
+        paths.push(p);
         TestFixture {
             tempdir,
             paths: env::join_paths(paths).unwrap(),
@@ -195,6 +199,17 @@ fn test_which_extension() {
 }
 
 #[test]
+#[cfg(windows)]
+fn test_which_no_extension() {
+    let f = TestFixture::new();
+    let b = Path::new("win-bin");
+    let which_result = which::which_in(&b, Some(&f.paths), ".").unwrap();
+    // Make sure the extension is the correct case.
+    assert_eq!(which_result.extension(), f.bins[9].extension());
+    assert_eq!(fs::canonicalize(&which_result).unwrap(), f.bins[9])
+}
+
+#[test]
 fn test_which_not_found() {
     let f = TestFixture::new();
     assert!(_which(&f, "a").is_err());
@@ -221,6 +236,7 @@ fn test_which_all() {
         .collect::<Vec<_>>();
     #[cfg(windows)]
     {
+        expected.retain(|p| p.file_stem().unwrap() == BIN_NAME);
         expected.retain(|p| p.extension().map(|ext| ext == "exe" || ext == "cmd") == Some(true));
     }
     #[cfg(not(windows))]
