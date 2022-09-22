@@ -302,7 +302,7 @@ impl PartialEq<Path> for path::PathBuf {
 ///
 /// Since `CanonicalPath` implements `Deref` for `std::path::Path`, all methods on
 /// `&std::path::Path` are also available to `&CanonicalPath` values.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct CanonicalPath {
     inner: path::PathBuf,
 }
@@ -408,8 +408,6 @@ impl AsRef<OsStr> for CanonicalPath {
         self.as_os_str()
     }
 }
-
-impl Eq for CanonicalPath {}
 
 impl PartialEq<path::PathBuf> for CanonicalPath {
     fn eq(&self, other: &path::PathBuf) -> bool {
