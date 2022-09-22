@@ -190,7 +190,7 @@ fn build_binary_checker() -> CompositeChecker {
 ///
 /// Since `which::Path` implements `Deref` for `std::path::Path`, all methods on `&std::path::Path`
 /// are also available to `&which::Path` values.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Path {
     inner: path::PathBuf,
 }
@@ -276,8 +276,6 @@ impl AsRef<OsStr> for Path {
         self.as_os_str()
     }
 }
-
-impl Eq for Path {}
 
 impl PartialEq<path::PathBuf> for Path {
     fn eq(&self, other: &path::PathBuf) -> bool {
