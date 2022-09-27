@@ -21,14 +21,12 @@ mod finder;
 mod helper;
 
 #[cfg(feature = "regex")]
-use regex::Regex;
-#[cfg(feature = "regex")]
 use std::borrow::Borrow;
 use std::env;
 use std::fmt;
 use std::path;
 
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 
 use crate::checker::{CompositeChecker, ExecutableChecker, ExistedChecker};
 pub use crate::error::*;
@@ -59,7 +57,31 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
     which_all(binary_name).and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
 }
 
-/// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
+/// Find an executable binary's path by name, ignoring `cwd`.
+///
+/// If given an absolute path, returns it if the file exists and is executable.
+///
+/// Does not resolve relative paths.
+///
+/// If given a string without path separators, looks for a file named
+/// `binary_name` at each directory in `$PATH` and if it finds an executable
+/// file there, returns it.
+///
+/// # Example
+///
+/// ```no_run
+/// use which::which;
+/// use std::path::PathBuf;
+///
+/// let result = which::which_global("rustc").unwrap();
+/// assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
+///
+/// ```
+pub fn which_global<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
+    which_all_global(binary_name).and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
+}
+
+/// Find all binaries with `binary_name` using `cwd` to resolve relative paths.
 pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
     let cwd = env::current_dir().ok();
 
@@ -68,6 +90,22 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
     let finder = Finder::new();
 
     finder.find(binary_name, env::var_os("PATH"), cwd, binary_checker)
+}
+
+/// Find all binaries with `binary_name` ignoring `cwd`.
+pub fn which_all_global<T: AsRef<OsStr>>(
+    binary_name: T,
+) -> Result<impl Iterator<Item = path::PathBuf>> {
+    let binary_checker = build_binary_checker();
+
+    let finder = Finder::new();
+
+    finder.find(
+        binary_name,
+        env::var_os("PATH"),
+        Option::<&Path>::None,
+        binary_checker,
+    )
 }
 
 /// Find all binaries matching a regular expression in a the system PATH.
@@ -174,10 +212,181 @@ where
     finder.find(binary_name, paths, Some(cwd), binary_checker)
 }
 
+/// Find all binaries with `binary_name` in the path list `paths`, ignoring `cwd`.
+pub fn which_in_global<T, U>(
+    binary_name: T,
+    paths: Option<U>,
+) -> Result<impl Iterator<Item = path::PathBuf>>
+where
+    T: AsRef<OsStr>,
+    U: AsRef<OsStr>,
+{
+    let binary_checker = build_binary_checker();
+
+    let finder = Finder::new();
+
+    finder.find(binary_name, paths, Option::<&Path>::None, binary_checker)
+}
+
 fn build_binary_checker() -> CompositeChecker {
     CompositeChecker::new()
         .add_checker(Box::new(ExistedChecker::new()))
         .add_checker(Box::new(ExecutableChecker::new()))
+}
+
+/// A wrapper containing all functionality in this crate.
+pub struct WhichConfig {
+    cwd: Option<either::Either<bool, path::PathBuf>>,
+    custom_path_list: Option<OsString>,
+    binary_name: Option<OsString>,
+    #[cfg(feature = "regex")]
+    regex: Option<Regex>,
+}
+
+impl Default for WhichConfig {
+    fn default() -> Self {
+        Self {
+            cwd: Some(either::Either::Left(true)),
+            custom_path_list: None,
+            binary_name: None,
+            #[cfg(feature = "regex")]
+            regex: None,
+        }
+    }
+}
+
+#[cfg(feature = "regex")]
+type Regex = regex::Regex;
+
+#[cfg(not(feature = "regex"))]
+type Regex = ();
+
+impl WhichConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Whether or not to use the current working directory. `true` by default.
+    ///
+    /// # Panics
+    ///
+    /// If regex was set previously, and you've just passed in `use_cwd: true`, this will panic.
+    pub fn system_cwd(mut self, use_cwd: bool) -> Self {
+        #[cfg(feature = "regex")]
+        if self.regex.is_some() && use_cwd {
+            panic!("which can't use regex and cwd at the same time!")
+        }
+        self.cwd = Some(either::Either::Left(use_cwd));
+        self
+    }
+
+    /// Sets a custom path for resolving relative paths.
+    ///
+    /// # Panics
+    ///
+    /// If regex was set previously, this will panic.
+    pub fn custom_cwd(mut self, cwd: path::PathBuf) -> Self {
+        #[cfg(feature = "regex")]
+        if self.regex.is_some() {
+            panic!("which can't use regex and cwd at the same time!")
+        }
+        self.cwd = Some(either::Either::Right(cwd));
+        self
+    }
+
+    /// Sets the path name regex to search for. You ***MUST*** call this, or [`Self::binary_name`] prior to searching.
+    ///
+    /// When `Regex` is disabled this function takes the unit type as a stand in. The parameter will change when
+    /// `Regex` is enabled.
+    ///
+    /// # Panics
+    ///
+    /// If the `regex` feature wasn't turned on for this crate this will always panic. Additionally if a
+    /// `cwd` (aka current working directory) or `binary_name` was set previously, this will panic, as those options
+    /// are incompatible with `regex`.
+    #[allow(unused_variables)]
+    pub fn regex(mut self, regex: Regex) -> Self {
+        #[cfg(not(feature = "regex"))]
+        {
+            panic!("which's regex feature was not enabled in your Cargo.toml!")
+        }
+        #[cfg(feature = "regex")]
+        {
+            if self.cwd != Some(either::Either::Left(false)) && self.cwd.is_some() {
+                panic!("which can't use regex and cwd at the same time!")
+            }
+            if self.binary_name.is_some() {
+                panic!("which can't use `binary_name` and `regex` at the same time!");
+            }
+            self.regex = Some(regex);
+            self
+        }
+    }
+
+    /// Sets the path name to search for. You ***MUST*** call this, or [`Self::regex`] prior to searching.
+    ///
+    /// # Panics
+    ///
+    /// If a `regex` was set previously this will panic as this is not compatible with `regex`.
+    pub fn binary_name(mut self, name: OsString) -> Self {
+        #[cfg(feature = "regex")]
+        if self.regex.is_some() {
+            panic!("which can't use `binary_name` and `regex` at the same time!");
+        }
+        self.binary_name = Some(name);
+        self
+    }
+
+    /// Uses the given string instead of the `PATH` env variable.
+    pub fn custom_path_list(mut self, custom_path_list: OsString) -> Self {
+        self.custom_path_list = Some(custom_path_list);
+        self
+    }
+
+    /// Uses the `PATH` env variable. Enabled by default.
+    pub fn system_path_list(mut self) -> Self {
+        self.custom_path_list = None;
+        self
+    }
+
+    /// Finishes configuring, runs the query and returns the first result.
+    pub fn first_result(self) -> Result<path::PathBuf> {
+        self.all_results()
+            .and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
+    }
+
+    /// Finishes configuring, runs the query and returns all results.
+    pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf>> {
+        let binary_checker = build_binary_checker();
+
+        let finder = Finder::new();
+
+        let paths = self.custom_path_list.or_else(|| env::var_os("PATH"));
+
+        #[cfg(feature = "regex")]
+        if let Some(regex) = self.regex {
+            return finder
+                .find_re(regex, paths, binary_checker)
+                .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf>>);
+        }
+
+        let cwd = match self.cwd {
+            Some(either::Either::Left(false)) => None,
+            Some(either::Either::Right(custom)) => Some(custom),
+            None | Some(either::Either::Left(true)) => env::current_dir().ok(),
+        };
+
+        finder
+            .find(
+                self.binary_name.expect(
+                    "binary_name not set! You must set binary_name or regex before searching!",
+                ),
+                paths,
+                cwd,
+                binary_checker,
+            )
+            .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf>>)
+    }
 }
 
 /// An owned, immutable wrapper around a `PathBuf` containing the path of an executable.
