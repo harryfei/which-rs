@@ -305,6 +305,7 @@ impl WhichConfig {
     /// `cwd` (aka current working directory) or `binary_name` was set previously, this will panic, as those options
     /// are incompatible with `regex`.
     #[allow(unused_variables)]
+    #[allow(unused_mut)]
     pub fn regex(mut self, regex: Regex) -> Self {
         #[cfg(not(feature = "regex"))]
         {
