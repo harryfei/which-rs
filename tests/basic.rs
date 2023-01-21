@@ -120,7 +120,7 @@ fn it_works() {
 #[cfg(unix)]
 fn test_which() {
     let f = TestFixture::new();
-    assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[0])
+    assert_eq!(_which(&f, BIN_NAME).unwrap(), f.bins[0])
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn test_which_re_accepts_owned_and_borrow() {
 fn test_which_extension() {
     let f = TestFixture::new();
     let b = Path::new(&BIN_NAME).with_extension("");
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[0])
+    assert_eq!(_which(&f, b).unwrap(), f.bins[0])
 }
 
 #[test]
@@ -281,8 +281,8 @@ fn test_which_absolute_path_case() {
 fn test_which_absolute_extension() {
     let f = TestFixture::new();
     // Don't append EXE_EXTENSION here.
-    let b = f.bins[3].parent().unwrap().join(&BIN_NAME);
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[3].canonicalize().unwrap());
+    let b = f.bins[3].parent().unwrap().join(BIN_NAME);
+    assert_eq!(_which(&f, b).unwrap(), f.bins[3].canonicalize().unwrap());
 }
 
 #[test]
@@ -321,7 +321,7 @@ fn test_which_relative_extension() {
     // so test a relative path with an extension here.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension(env::consts::EXE_EXTENSION);
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[3].canonicalize().unwrap());
+    assert_eq!(_which(&f, b).unwrap(), f.bins[3].canonicalize().unwrap());
 }
 
 #[test]
@@ -379,7 +379,7 @@ fn test_which_absolute_non_executable() {
     // Shouldn't return non-executable files, even if given an absolute path.
     let f = TestFixture::new();
     let b = f.touch("b/another", "").unwrap();
-    assert!(_which(&f, &b).is_err());
+    assert!(_which(&f, b).is_err());
 }
 
 #[test]
