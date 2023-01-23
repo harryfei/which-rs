@@ -133,7 +133,7 @@ fn test_which() {
 #[cfg(windows)]
 fn test_which() {
     let f = TestFixture::new();
-    assert_eq!(_which(&f, &BIN_NAME).unwrap(), f.bins[1])
+    assert_eq!(_which(&f, BIN_NAME).unwrap(), f.bins[1])
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn test_which_extension() {
 fn test_which_extension() {
     let f = TestFixture::new();
     let b = Path::new(&BIN_NAME).with_extension("cmd");
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[2])
+    assert_eq!(_which(&f, b).unwrap(), f.bins[2])
 }
 
 #[test]
@@ -209,7 +209,7 @@ fn test_which_extension() {
 fn test_which_no_extension() {
     let f = TestFixture::new();
     let b = Path::new("win-bin");
-    let which_result = which::which_in(&b, Some(&f.paths), ".").unwrap();
+    let which_result = which::which_in(b, Some(&f.paths), ".").unwrap();
     // Make sure the extension is the correct case.
     assert_eq!(which_result.extension(), f.bins[9].extension());
     assert_eq!(fs::canonicalize(&which_result).unwrap(), f.bins[9])
@@ -279,7 +279,7 @@ fn test_which_absolute_path_case() {
     // is accepted.
     let f = TestFixture::new();
     let p = &f.bins[4];
-    assert_eq!(_which(&f, &p).unwrap(), f.bins[4].canonicalize().unwrap());
+    assert_eq!(_which(&f, p).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
@@ -296,8 +296,8 @@ fn test_which_absolute_extension() {
 fn test_which_absolute_extension() {
     let f = TestFixture::new();
     // Don't append EXE_EXTENSION here.
-    let b = f.bins[4].parent().unwrap().join(&BIN_NAME);
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[4].canonicalize().unwrap());
+    let b = f.bins[4].parent().unwrap().join(BIN_NAME);
+    assert_eq!(_which(&f, b).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn test_which_relative_extension() {
     // so test a relative path with an extension here.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension("cmd");
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[5].canonicalize().unwrap());
+    assert_eq!(_which(&f, b).unwrap(), f.bins[5].canonicalize().unwrap());
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn test_which_relative_extension_case() {
     // is accepted.
     let f = TestFixture::new();
     let b = Path::new("b/bin").with_extension("EXE");
-    assert_eq!(_which(&f, &b).unwrap(), f.bins[4].canonicalize().unwrap());
+    assert_eq!(_which(&f, b).unwrap(), f.bins[4].canonicalize().unwrap());
 }
 
 #[test]
