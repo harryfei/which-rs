@@ -25,10 +25,16 @@ const BIN_NAME: &str = "bin";
 fn mk_bin(dir: &Path, path: &str, extension: &str) -> io::Result<PathBuf> {
     use std::os::unix::fs::OpenOptionsExt;
     let bin = dir.join(path).with_extension(extension);
+
+    #[cfg(target_os = "macos")]
+    let mode = libc::S_IXUSR as u32;
+    #[cfg(target_os = "linux")]
+    let mode = libc::S_IXUSR;
+    let mode = 0o666 | mode;
     fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .mode(0o666 | (libc::S_IXUSR as u32))
+        .mode(mode)
         .open(&bin)
         .and_then(|_f| bin.canonicalize())
 }
