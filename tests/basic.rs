@@ -144,10 +144,7 @@ fn test_which_re_in_with_matches() {
     f.mk_bin("b/bin_1", "").unwrap();
     let re = Regex::new(r"bin_\d").unwrap();
 
-    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths))
-        .unwrap()
-        .into_iter()
-        .collect();
+    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths)).unwrap().collect();
 
     let temp = f.tempdir;
 
@@ -163,10 +160,7 @@ fn test_which_re_in_without_matches() {
     let f = TestFixture::new();
     let re = Regex::new(r"bi[^n]").unwrap();
 
-    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths))
-        .unwrap()
-        .into_iter()
-        .collect();
+    let result: Vec<PathBuf> = which::which_re_in(re, Some(f.paths)).unwrap().collect();
 
     assert_eq!(result, Vec::<PathBuf>::new())
 }
