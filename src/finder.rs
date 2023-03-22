@@ -140,7 +140,7 @@ impl Finder {
         Self::append_extension(new_paths)
     }
 
-    #[cfg(unix)]
+    #[cfg(not(windows))]
     fn append_extension<P>(paths: P) -> impl IntoIterator<Item = PathBuf>
     where
         P: IntoIterator<Item = PathBuf>,
