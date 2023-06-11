@@ -2,17 +2,19 @@ use crate::checker::CompositeChecker;
 use crate::error::*;
 #[cfg(windows)]
 use crate::helper::has_executable_extension;
+use dirs::home_dir;
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
 #[cfg(feature = "regex")]
 use std::borrow::Borrow;
+use std::borrow::Cow;
 use std::env;
 use std::ffi::OsStr;
 #[cfg(any(feature = "regex", target_os = "windows"))]
 use std::fs;
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub trait Checker {
     fn is_valid(&self, path: &Path) -> bool;
@@ -135,7 +137,9 @@ impl Finder {
     where
         P: IntoIterator<Item = PathBuf>,
     {
-        let new_paths = paths.into_iter().map(move |p| p.join(binary_name.clone()));
+        let new_paths = paths
+            .into_iter()
+            .map(move |p| tilde_expansion(&p).join(binary_name.clone()));
 
         Self::append_extension(new_paths)
     }
@@ -207,6 +211,21 @@ impl Finder {
                     )
                 }
             })
+    }
+}
+
+fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
+    let mut component_iter = p.components();
+    if let Some(Component::Normal(o)) = component_iter.next() {
+        if o == "~" {
+            let mut new_path = home_dir().unwrap_or_default();
+            new_path.extend(component_iter);
+            Cow::Owned(new_path)
+        } else {
+            Cow::Borrowed(p)
+        }
+    } else {
+        Cow::Borrowed(p)
     }
 }
 

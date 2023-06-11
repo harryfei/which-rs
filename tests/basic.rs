@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::{env, vec};
 use tempfile::TempDir;
 
+#[derive(Debug)]
 struct TestFixture {
     /// Temp directory.
     pub tempdir: TempDir,
@@ -84,6 +85,33 @@ impl TestFixture {
         }
     }
 
+    #[cfg(unix)]
+    pub fn new_with_tilde_path() -> TestFixture {
+        let tempdir = tempfile::tempdir().unwrap();
+        let mut builder = fs::DirBuilder::new();
+        builder.recursive(true);
+        let mut paths = vec![];
+        let mut bins = vec![];
+        for d in SUBDIRS.iter() {
+            let p = PathBuf::from("~").join(d);
+            let p_bin = tempdir.path().join(d);
+            builder.create(&p_bin).unwrap();
+            bins.push(mk_bin(&p_bin, BIN_NAME, "").unwrap());
+            bins.push(mk_bin(&p_bin, BIN_NAME, "exe").unwrap());
+            bins.push(mk_bin(&p_bin, BIN_NAME, "cmd").unwrap());
+            paths.push(p);
+        }
+        let p = tempdir.path().join("win-bin");
+        builder.create(&p).unwrap();
+        bins.push(mk_bin(&p, "win-bin", "exe").unwrap());
+        paths.push(p);
+        TestFixture {
+            tempdir,
+            paths: env::join_paths(paths).unwrap(),
+            bins,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn touch(&self, path: &str, extension: &str) -> io::Result<PathBuf> {
         touch(self.tempdir.path(), path, extension)
@@ -135,6 +163,26 @@ fn test_which() {
     let f = TestFixture::new();
     assert_eq!(_which(&f, BIN_NAME).unwrap(), f.bins[1])
 }
+
+#[test]
+#[cfg(unix)]
+fn test_which_tilde() {
+    let old_home = env::var_os("HOME");
+    let f = TestFixture::new_with_tilde_path();
+    env::set_var("HOME", f.tempdir.path().as_os_str());
+    assert_eq!(_which(&f, BIN_NAME).unwrap(), f.bins[0]);
+    if let Some(old_home) = old_home {
+        env::set_var("HOME", old_home);
+    } else {
+        env::remove_var("HOME");
+    }
+}
+
+// Windows test_which_tilde intentionally omitted because
+// we don't want to pollute the home directory.
+// It's non-trivial to adjust which directory Windows thinks
+// is the home directory. At this time, tilde expansion has
+// no Windows specific behavior. It works as normal on Windows.
 
 #[test]
 #[cfg(all(unix, feature = "regex"))]
