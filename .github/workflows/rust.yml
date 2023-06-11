@@ -94,4 +94,4 @@ jobs:
 
       # Run the ignored tests that expect the above setup
       - name: Build | Test
-        run: cargo test --workspace --all-features -- -Z unstable-options --include-ignored
+        run: cargo test --workspace --all-features -- --include-ignored
