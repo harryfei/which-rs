@@ -14,6 +14,8 @@
 //!
 //! ```
 
+#![forbid(unsafe_code)]
+
 mod checker;
 mod error;
 mod finder;

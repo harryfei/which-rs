@@ -14,13 +14,14 @@ keywords = ["which", "which-rs", "unix", "command"]
 [dependencies]
 dirs = "5.0.1"
 either = "1.6.1"
-libc = "0.2.121"
 regex = { version = "1.5.5", optional = true }
+rustix = { version = "0.38.10", default-features = false, features = ["fs", "std"] }
 
 [target.'cfg(windows)'.dependencies]
 once_cell = "1"
 
 [dev-dependencies]
+libc = "0.2.147"
 tempfile = "3.3.0"
 
 [package.metadata.docs.rs]
