@@ -27,10 +27,8 @@ fn mk_bin(dir: &Path, path: &str, extension: &str) -> io::Result<PathBuf> {
     use std::os::unix::fs::OpenOptionsExt;
     let bin = dir.join(path).with_extension(extension);
 
-    #[cfg(target_os = "macos")]
-    let mode = libc::S_IXUSR as u32;
-    #[cfg(target_os = "linux")]
-    let mode = libc::S_IXUSR;
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let mode = rustix::fs::Mode::XUSR.bits();
     let mode = 0o666 | mode;
     fs::OpenOptions::new()
         .write(true)
