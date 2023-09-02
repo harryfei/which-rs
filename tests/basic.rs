@@ -28,7 +28,7 @@ fn mk_bin(dir: &Path, path: &str, extension: &str) -> io::Result<PathBuf> {
     let bin = dir.join(path).with_extension(extension);
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    let mode = rustix::fs::Mode::XUSR.bits();
+    let mode = rustix::fs::Mode::XUSR.bits() as u32;
     let mode = 0o666 | mode;
     fs::OpenOptions::new()
         .write(true)
