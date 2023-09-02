@@ -14,11 +14,11 @@
 //!
 //! ```
 
-mod checker;
-mod error;
-mod finder;
+pub mod checker;
+pub mod error;
+pub mod finder;
 #[cfg(windows)]
-mod helper;
+pub mod helper;
 
 #[cfg(feature = "regex")]
 use std::borrow::Borrow;
@@ -228,7 +228,7 @@ where
     finder.find(binary_name, paths, Option::<&Path>::None, binary_checker)
 }
 
-fn build_binary_checker() -> CompositeChecker {
+pub fn build_binary_checker() -> CompositeChecker {
     CompositeChecker::new()
         .add_checker(Box::new(ExistedChecker::new()))
         .add_checker(Box::new(ExecutableChecker::new()))
