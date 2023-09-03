@@ -22,6 +22,7 @@ struct TestFixture {
 const SUBDIRS: &[&str] = &["a", "b", "c"];
 const BIN_NAME: &str = "bin";
 
+#[allow(clippy::unnecessary_cast)]
 #[cfg(unix)]
 fn mk_bin(dir: &Path, path: &str, extension: &str) -> io::Result<PathBuf> {
     use std::os::unix::fs::OpenOptionsExt;
