@@ -95,3 +95,8 @@ jobs:
       # Run the ignored tests that expect the above setup
       - name: Build | Test
         run: cargo test --workspace --all-features -- --include-ignored
+  cargo-deny:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: EmbarkStudios/cargo-deny-action@v1
