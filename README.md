@@ -30,6 +30,10 @@ A Rust equivalent of Unix command "which". Locate installed executable in cross 
         .for_each(|pth| println!("{}", pth.to_string_lossy()));
     ```
 
+## MSRV
+
+This crate currently has an MSRV of Rust 1.63. Increasing the MSRV is considered a breaking change and thus requires a major version bump.
+
 ## Documentation
 
 The documentation is [available online](https://docs.rs/which/).
