@@ -1,6 +1,6 @@
 [package]
 name = "which"
-version = "4.4.1"
+version = "4.4.2"
 edition = "2021"
 authors = ["Harry Fei <tiziyuanfang@gmail.com>"]
 repository = "https://github.com/harryfei/which-rs.git"
