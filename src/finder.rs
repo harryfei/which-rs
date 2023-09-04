@@ -2,7 +2,6 @@ use crate::checker::CompositeChecker;
 use crate::error::*;
 #[cfg(windows)]
 use crate::helper::has_executable_extension;
-use dirs::home_dir;
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
@@ -15,6 +14,15 @@ use std::ffi::OsStr;
 use std::fs;
 use std::iter;
 use std::path::{Component, Path, PathBuf};
+
+// Home dir shim, use home crate when possible. Otherwise, return None
+#[cfg(any(windows, unix, target_os = "redox"))]
+use home::home_dir;
+
+#[cfg(not(any(windows, unix, target_os = "redox")))]
+fn home_dir() -> Option<std::path::PathBuf> {
+    None
+}
 
 pub trait Checker {
     fn is_valid(&self, path: &Path) -> bool;
