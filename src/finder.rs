@@ -2,8 +2,8 @@ use crate::checker::CompositeChecker;
 use crate::error::*;
 #[cfg(windows)]
 use crate::helper::has_executable_extension;
-use dirs::home_dir;
 use either::Either;
+use home::home_dir;
 #[cfg(feature = "regex")]
 use regex::Regex;
 #[cfg(feature = "regex")]

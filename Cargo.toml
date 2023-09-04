@@ -12,8 +12,8 @@ categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
 [dependencies]
-dirs = "5.0.1"
 either = "1.6.1"
+home = "0.5.5"
 regex = { version = "1.5.5", optional = true }
 rustix = { version = "0.38.10", default-features = false, features = ["fs", "std"] }
 
