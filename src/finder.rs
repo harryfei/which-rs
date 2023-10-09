@@ -198,7 +198,6 @@ impl Finder {
                 if has_executable_extension(&p, &PATH_EXTENSIONS) {
                     Box::new(iter::once(p))
                 } else {
-                    let bare_file = p.extension().map(|_| p.clone());
                     // Appended paths with windows executable extensions.
                     // e.g. path `c:/windows/bin[.ext]` will expand to:
                     // [c:/windows/bin.ext]
@@ -207,15 +206,13 @@ impl Finder {
                     // c:/windows/bin[.ext].CMD
                     // ...
                     Box::new(
-                        bare_file
-                            .into_iter()
-                            .chain(PATH_EXTENSIONS.iter().map(move |e| {
-                                // Append the extension.
-                                let mut p = p.clone().into_os_string();
-                                p.push(e);
+                        iter::once(p.clone()).chain(PATH_EXTENSIONS.iter().map(move |e| {
+                            // Append the extension.
+                            let mut p = p.clone().into_os_string();
+                            p.push(e);
 
-                                PathBuf::from(p)
-                            })),
+                            PathBuf::from(p)
+                        })),
                     )
                 }
             })

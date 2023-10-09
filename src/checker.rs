@@ -40,6 +40,7 @@ impl Checker for ExistedChecker {
                 file_type.is_file() || file_type.is_symlink()
             })
             .unwrap_or(false)
+            && (path.extension().is_some() || matches_arch(&path))
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -48,6 +49,18 @@ impl Checker for ExistedChecker {
             .map(|metadata| metadata.is_file())
             .unwrap_or(false)
     }
+}
+
+#[cfg(target_os = "windows")]
+fn matches_arch(path: &Path) -> bool {
+    use std::os::windows::prelude::OsStrExt;
+
+    let os_str = path.as_os_str().encode_wide().collect::<Vec<u16>>();
+    let mut out = 0;
+    let is_executable = unsafe {
+        windows_sys::Win32::Storage::FileSystem::GetBinaryTypeW(os_str.as_ptr(), &mut out)
+    };
+    is_executable != 0
 }
 
 pub struct CompositeChecker {

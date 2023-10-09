@@ -21,6 +21,7 @@ rustix = { version = "0.38.10", default-features = false, features = ["fs", "std
 home = "0.5.5"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.48", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
 once_cell = "1"
 
 [dev-dependencies]
