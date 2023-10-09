@@ -453,7 +453,7 @@ fn test_failure() {
 #[test]
 #[cfg(windows)]
 fn windows_no_extension_but_executable() {
-    let this_executable = PathBuf::from(std::env::args().next().unwrap());
+    let this_executable = std::env::current_exe().unwrap();
     let new_name = this_executable.parent().unwrap().join("test_executable");
     std::fs::copy(&this_executable, &new_name).unwrap();
     let found_executable = which::which_in_global(
