@@ -449,3 +449,20 @@ fn test_failure() {
 
     let _ = run();
 }
+
+#[test]
+#[cfg(windows)]
+fn windows_no_extension_but_executable() {
+    let this_executable = PathBuf::from(std::env::args().next().unwrap());
+    let new_name = this_executable.parent().unwrap().join("test_executable");
+    std::fs::copy(&this_executable, &new_name).unwrap();
+    let found_executable = which::which_in_global(
+        new_name.file_name().unwrap(),
+        Some(this_executable.parent().unwrap()),
+    )
+    .unwrap()
+    .next()
+    .unwrap();
+    assert_eq!(found_executable, new_name);
+    std::fs::remove_file(new_name).unwrap();
+}
