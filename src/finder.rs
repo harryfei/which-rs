@@ -83,7 +83,7 @@ impl Finder {
             }
             _ => {
                 // Search binary in PATHs(defined in environment variable).
-                let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+                let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
                 let paths: Vec<_> = env::split_paths(&p).collect();
 
                 Either::Right(Self::path_search_candidates(path, paths).into_iter())
@@ -105,7 +105,7 @@ impl Finder {
     where
         T: AsRef<OsStr>,
     {
-        let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+        let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
         // Collect needs to happen in order to not have to
         // change the API to borrow on `paths`.
         #[allow(clippy::needless_collect)]

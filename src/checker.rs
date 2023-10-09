@@ -40,7 +40,7 @@ impl Checker for ExistedChecker {
                 file_type.is_file() || file_type.is_symlink()
             })
             .unwrap_or(false)
-            && (path.extension().is_some() || matches_arch(&path))
+            && (path.extension().is_some() || matches_arch(path))
     }
 
     #[cfg(not(target_os = "windows"))]
