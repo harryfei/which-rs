@@ -83,8 +83,12 @@ impl Finder {
             }
             _ => {
                 // Search binary in PATHs(defined in environment variable).
-                let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
-                let paths: Vec<_> = env::split_paths(&p).collect();
+                let paths =
+                    env::split_paths(&paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?)
+                        .collect::<Vec<_>>();
+                if paths.is_empty() {
+                    return Err(Error::CannotGetCurrentDirAndPathListEmpty);
+                }
 
                 Either::Right(Self::path_search_candidates(path, paths).into_iter())
             }
