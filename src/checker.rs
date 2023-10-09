@@ -55,7 +55,11 @@ impl Checker for ExistedChecker {
 fn matches_arch(path: &Path) -> bool {
     use std::os::windows::prelude::OsStrExt;
 
-    let os_str = path.as_os_str().encode_wide().collect::<Vec<u16>>();
+    let os_str = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<u16>>();
     let mut out = 0;
     let is_executable = unsafe {
         windows_sys::Win32::Storage::FileSystem::GetBinaryTypeW(os_str.as_ptr(), &mut out)
