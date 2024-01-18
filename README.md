@@ -32,7 +32,10 @@ A Rust equivalent of Unix command "which". Locate installed executable in cross 
 
 ## MSRV
 
-This crate currently has an MSRV of Rust 1.63. Increasing the MSRV is considered a breaking change and thus requires a major version bump.
+This crate currently has an MSRV of Rust 1.70. Increasing the MSRV is considered a breaking change and thus requires a major version bump.
+
+We cannot make any guarantees about the MSRV of our dependencies. You may be required to pin one of our dependencies to a lower version in your own Cargo.toml in order to compile
+with the minimum supported Rust version. Eventually Cargo will handle this automatically. See [rust-lang/cargo#9930](https://github.com/rust-lang/cargo/issues/9930) for more.
 
 ## Documentation
 
