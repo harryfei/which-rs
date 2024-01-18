@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 6.0.0
+
+- MSRV is now 1.70
+- Upgraded all dependencies to latest version
+
 ## 5.0.0
 
 - Remove several unused error messages
