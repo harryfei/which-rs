@@ -11,7 +11,7 @@ impl ExecutableChecker {
 }
 
 impl Checker for ExecutableChecker {
-    #[cfg(any(unix, target_os = "wasi"))]
+    #[cfg(any(unix, target_os = "wasi", target_os = "redox"))]
     fn is_valid(&self, path: &Path) -> bool {
         use rustix::fs as rfs;
         rfs::access(path, rfs::Access::EXEC_OK).is_ok()
@@ -53,18 +53,7 @@ impl Checker for ExistedChecker {
 
 #[cfg(target_os = "windows")]
 fn matches_arch(path: &Path) -> bool {
-    use std::os::windows::prelude::OsStrExt;
-
-    let os_str = path
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
-    let mut out = 0;
-    let is_executable = unsafe {
-        windows_sys::Win32::Storage::FileSystem::GetBinaryTypeW(os_str.as_ptr(), &mut out)
-    };
-    is_executable != 0
+    winsafe::GetBinaryType(&path.display().to_string()).is_ok()
 }
 
 pub struct CompositeChecker {
