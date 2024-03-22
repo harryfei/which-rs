@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 6.0.1
+
+- Remove dependency on `once_cell` for Windows users, replace with `std::sync::OnceLock`.
+
 ## 6.0.0
 
 - MSRV is now 1.70
