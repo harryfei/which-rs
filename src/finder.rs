@@ -169,37 +169,38 @@ impl Finder {
     where
         P: IntoIterator<Item = PathBuf>,
     {
-        use once_cell::sync::Lazy;
+        use std::sync::OnceLock;
 
         // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
         // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
         // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
         // hence its retention.)
-        static PATH_EXTENSIONS: Lazy<Vec<String>> = Lazy::new(|| {
-            env::var("PATHEXT")
-                .map(|pathext| {
-                    pathext
-                        .split(';')
-                        .filter_map(|s| {
-                            if s.as_bytes().first() == Some(&b'.') {
-                                Some(s.to_owned())
-                            } else {
-                                // Invalid segment; just ignore it.
-                                None
-                            }
-                        })
-                        .collect()
-                })
-                // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                // improbable and would probably break Windows badly. Still, don't crash:
-                .unwrap_or_default()
-        });
+        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
 
         paths
             .into_iter()
             .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
+                let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
+                    env::var("PATHEXT")
+                        .map(|pathext| {
+                            pathext
+                                .split(';')
+                                .filter_map(|s| {
+                                    if s.as_bytes().first() == Some(&b'.') {
+                                        Some(s.to_owned())
+                                    } else {
+                                        // Invalid segment; just ignore it.
+                                        None
+                                    }
+                                })
+                                .collect()
+                        })
+                        // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                        // improbable and would probably break Windows badly. Still, don't crash:
+                        .unwrap_or_default()
+                });
                 // Check if path already have executable extension
-                if has_executable_extension(&p, &PATH_EXTENSIONS) {
+                if has_executable_extension(&p, path_extensions) {
                     Box::new(iter::once(p))
                 } else {
                     // Appended paths with windows executable extensions.
@@ -210,7 +211,7 @@ impl Finder {
                     // c:/windows/bin[.ext].CMD
                     // ...
                     Box::new(
-                        iter::once(p.clone()).chain(PATH_EXTENSIONS.iter().map(move |e| {
+                        iter::once(p.clone()).chain(path_extensions.iter().map(move |e| {
                             // Append the extension.
                             let mut p = p.clone().into_os_string();
                             p.push(e);
