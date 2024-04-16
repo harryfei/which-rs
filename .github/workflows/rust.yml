@@ -10,14 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup | Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          override: true
-          profile: minimal
           components: rustfmt
 
       - name: Build | Format
@@ -32,21 +30,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup | Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          override: true
-          profile: minimal
           components: clippy
 
       - name: Build | Lint
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --workspace --all-targets --all-features -- -Dwarnings
+        run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
 
   # Ensure that the project could be successfully compiled
   cargo_check:
@@ -57,14 +50,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup | Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          profile: minimal
-          override: true
           target: ${{ matrix.target }}
 
       - name: Build | Check
@@ -83,14 +74,12 @@ jobs:
         rust: ['1.70', stable, nightly]
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup | Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
 
       # Run the ignored tests that expect the above setup
       - name: Build | Test
