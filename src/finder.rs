@@ -232,9 +232,10 @@ impl Finder {
                             // Append the extension.
                             let mut p = p.clone().into_os_string();
                             p.push(e);
+                            let ret = PathBuf::from(p);
                             #[cfg(feature = "tracing")]
-                            tracing::trace!("possible extension: {}", p.display());
-                            PathBuf::from(p)
+                            tracing::trace!("possible extension: {}", ret.display());
+                            ret
                         })),
                     )
                 }
