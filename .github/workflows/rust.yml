@@ -40,6 +40,8 @@ jobs:
 
       - name: Build | Lint
         run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
+      - name: Build | Lint (no features)
+        run: cargo clippy --workspace --all-targets -- -Dwarnings
 
   # Ensure that the project could be successfully compiled
   cargo_check:
