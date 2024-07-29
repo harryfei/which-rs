@@ -41,13 +41,22 @@ impl Checker for ExistedChecker {
             .map(|metadata| {
                 let file_type = metadata.file_type();
                 #[cfg(feature = "tracing")]
-                tracing::trace!("{} is_file() = {}, is_symlink() = {}", new_path.display(), file_type.is_file(), file_type.is_symlink());
+                tracing::trace!(
+                    "{} is_file() = {}, is_symlink() = {}",
+                    path.display(),
+                    file_type.is_file(),
+                    file_type.is_symlink()
+                );
                 file_type.is_file() || file_type.is_symlink()
             })
             .unwrap_or(false)
             && (path.extension().is_some() || matches_arch(path));
         #[cfg(feature = "tracing")]
-        tracing::trace!("{} has_extension = {}, ExistedChecker::is_valid() = {ret}", path.display(), path.extension().is_some());
+        tracing::trace!(
+            "{} has_extension = {}, ExistedChecker::is_valid() = {ret}",
+            path.display(),
+            path.extension().is_some()
+        );
         ret
     }
 
