@@ -78,10 +78,17 @@ impl Finder {
 
         let binary_path_candidates = match cwd {
             Some(cwd) if path.has_separator() => {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "{} has a path seperator, so only CWD will be searched.",
+                    path.display()
+                );
                 // Search binary in cwd if the path have a path separator.
                 Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
             }
             _ => {
+                #[cfg(feature = "tracing")]
+                tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths =
                     env::split_paths(&paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?)
@@ -201,8 +208,18 @@ impl Finder {
                 });
                 // Check if path already have executable extension
                 if has_executable_extension(&p, path_extensions) {
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!(
+                        "{} already has an executable extension, not modifying it further",
+                        p.display()
+                    );
                     Box::new(iter::once(p))
                 } else {
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!(
+                        "{} has no extension, using PATHEXT environment variable to infer one",
+                        p.display()
+                    );
                     // Appended paths with windows executable extensions.
                     // e.g. path `c:/windows/bin[.ext]` will expand to:
                     // [c:/windows/bin.ext]
@@ -215,7 +232,8 @@ impl Finder {
                             // Append the extension.
                             let mut p = p.clone().into_os_string();
                             p.push(e);
-
+                            #[cfg(feature = "tracing")]
+                            tracing::trace!("possible extension: {}", p.display());
                             PathBuf::from(p)
                         })),
                     )
@@ -230,6 +248,11 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
         if o == "~" {
             let mut new_path = home_dir().unwrap_or_default();
             new_path.extend(component_iter);
+            #[cfg(feature = "tracing")]
+            tracing::trace!(
+                "found tilde, substituting in user's home directory to get {}",
+                new_path.display()
+            );
             Cow::Owned(new_path)
         } else {
             Cow::Borrowed(p)
