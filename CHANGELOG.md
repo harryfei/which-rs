@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 6.0.2
+
+- Add `tracing` feature which outputs debugging information to the [`tracing`](https://crates.io/crates/tracing) ecosystem.
+
 ## 6.0.1
 
 - Remove dependency on `once_cell` for Windows users, replace with `std::sync::OnceLock`.
