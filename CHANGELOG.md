@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 6.0.3
+
+- Enhance `tracing` feature with some `debug` level logs for higher level logic.
+
 ## 6.0.2
 
 - Add `tracing` feature which outputs debugging information to the [`tracing`](https://crates.io/crates/tracing) ecosystem.
