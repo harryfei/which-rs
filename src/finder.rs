@@ -76,6 +76,14 @@ impl Finder {
     {
         let path = PathBuf::from(&binary_name);
 
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            "query binary_name = {:?}, paths = {:?}, cwd = {:?}",
+            binary_name.as_ref().to_string_lossy(),
+            paths.as_ref().map(|p| p.as_ref().to_string_lossy()),
+            cwd.as_ref().map(|p| p.as_ref().display())
+        );
+
         let binary_path_candidates = match cwd {
             Some(cwd) if path.has_separator() => {
                 #[cfg(feature = "tracing")]
@@ -100,10 +108,15 @@ impl Finder {
                 Either::Right(Self::path_search_candidates(path, paths).into_iter())
             }
         };
-
-        Ok(binary_path_candidates
+        let ret = binary_path_candidates
             .filter(move |p| binary_checker.is_valid(p))
-            .map(correct_casing))
+            .map(correct_casing);
+        #[cfg(feature = "tracing")]
+        let ret = ret.map(|p| {
+            tracing::debug!("found path {}", p.display());
+            p
+        });
+        Ok(ret)
     }
 
     #[cfg(feature = "regex")]
