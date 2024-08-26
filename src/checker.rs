@@ -24,6 +24,11 @@ impl Checker for ExecutableChecker {
     fn is_valid(&self, _path: &Path) -> bool {
         true
     }
+
+    #[cfg(target_arch = "wasm32")]
+    fn is_valid(&self, _path: &Path) -> bool {
+        true
+    }
 }
 
 pub struct ExistedChecker;
