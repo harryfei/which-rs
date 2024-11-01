@@ -1,7 +1,7 @@
 use crate::checker::CompositeChecker;
-use crate::error::*;
 #[cfg(windows)]
 use crate::helper::has_executable_extension;
+use crate::{error::*, NonFatalErrorHandler};
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
@@ -25,7 +25,11 @@ fn home_dir() -> Option<std::path::PathBuf> {
 }
 
 pub trait Checker {
-    fn is_valid(&self, path: &Path) -> bool;
+    fn is_valid<F: NonFatalErrorHandler>(
+        &self,
+        path: &Path,
+        nonfatal_error_handler: &mut F,
+    ) -> bool;
 }
 
 trait PathExt {
@@ -62,17 +66,18 @@ impl Finder {
         Finder
     }
 
-    pub fn find<T, U, V>(
+    pub fn find<'a, T, U, V, F: NonFatalErrorHandler + 'a>(
         &self,
         binary_name: T,
         paths: Option<U>,
         cwd: Option<V>,
         binary_checker: CompositeChecker,
-    ) -> Result<impl Iterator<Item = PathBuf>>
+        mut nonfatal_error_handler: F,
+    ) -> Result<impl Iterator<Item = PathBuf> + 'a>
     where
         T: AsRef<OsStr>,
         U: AsRef<OsStr>,
-        V: AsRef<Path>,
+        V: AsRef<Path> + 'a,
     {
         let path = PathBuf::from(&binary_name);
 
@@ -92,39 +97,40 @@ impl Finder {
                     path.display()
                 );
                 // Search binary in cwd if the path have a path separator.
-                Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
+                Either::Left(Self::cwd_search_candidates(path, cwd))
             }
             _ => {
                 #[cfg(feature = "tracing")]
                 tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
-                let paths =
-                    env::split_paths(&paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?)
-                        .collect::<Vec<_>>();
+                let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
+                let paths = env::split_paths(&paths).collect::<Vec<_>>();
                 if paths.is_empty() {
                     return Err(Error::CannotGetCurrentDirAndPathListEmpty);
                 }
 
-                Either::Right(Self::path_search_candidates(path, paths).into_iter())
+                Either::Right(Self::path_search_candidates(path, paths))
             }
         };
-        let ret = binary_path_candidates
-            .filter(move |p| binary_checker.is_valid(p))
-            .map(correct_casing);
+        let ret = binary_path_candidates.into_iter().filter_map(move |p| {
+            binary_checker
+                .is_valid(&p, &mut nonfatal_error_handler)
+                .then(|| correct_casing(p, &mut nonfatal_error_handler))
+        });
         #[cfg(feature = "tracing")]
-        let ret = ret.map(|p| {
+        let ret = ret.inspect(|p| {
             tracing::debug!("found path {}", p.display());
-            p
         });
         Ok(ret)
     }
 
     #[cfg(feature = "regex")]
-    pub fn find_re<T>(
+    pub fn find_re<T, F: NonFatalErrorHandler>(
         &self,
         binary_regex: impl Borrow<Regex>,
         paths: Option<T>,
         binary_checker: CompositeChecker,
+        mut nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf>>
     where
         T: AsRef<OsStr>,
@@ -148,7 +154,7 @@ impl Finder {
                     false
                 }
             })
-            .filter(move |p| binary_checker.is_valid(p));
+            .filter(move |p| binary_checker.is_valid(p, &mut nonfatal_error_handler));
 
         Ok(matching_re)
     }
@@ -277,14 +283,24 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
 }
 
 #[cfg(target_os = "windows")]
-fn correct_casing(mut p: PathBuf) -> PathBuf {
+fn correct_casing<F: NonFatalErrorHandler>(
+    mut p: PathBuf,
+    nonfatal_error_handler: &mut F,
+) -> PathBuf {
     if let (Some(parent), Some(file_name)) = (p.parent(), p.file_name()) {
         if let Ok(iter) = fs::read_dir(parent) {
-            for e in iter.filter_map(std::result::Result::ok) {
-                if e.file_name().eq_ignore_ascii_case(file_name) {
-                    p.pop();
-                    p.push(e.file_name());
-                    break;
+            for e in iter {
+                match e {
+                    Ok(e) => {
+                        if e.file_name().eq_ignore_ascii_case(file_name) {
+                            p.pop();
+                            p.push(e.file_name());
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        nonfatal_error_handler.handle(NonFatalError::Io(e));
+                    }
                 }
             }
         }
@@ -293,6 +309,6 @@ fn correct_casing(mut p: PathBuf) -> PathBuf {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn correct_casing(p: PathBuf) -> PathBuf {
+fn correct_casing<F: NonFatalErrorHandler>(p: PathBuf, _nonfatal_error_handler: &mut F) -> PathBuf {
     p
 }

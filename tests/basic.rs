@@ -128,7 +128,7 @@ fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<which::Can
 fn _which_all<'a, T: AsRef<OsStr> + 'a>(
     f: &'a TestFixture,
     path: T,
-) -> which::Result<impl Iterator<Item = which::Result<which::CanonicalPath>> + '_> {
+) -> which::Result<impl Iterator<Item = which::Result<which::CanonicalPath>> + 'a> {
     which::CanonicalPath::all_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
 

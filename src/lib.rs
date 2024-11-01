@@ -30,7 +30,7 @@ use std::path;
 
 use std::ffi::{OsStr, OsString};
 
-use crate::checker::{CompositeChecker, ExecutableChecker, ExistedChecker};
+use crate::checker::CompositeChecker;
 pub use crate::error::*;
 use crate::finder::Finder;
 
@@ -87,26 +87,25 @@ pub fn which_global<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
 pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
     let cwd = env::current_dir().ok();
 
-    let binary_checker = build_binary_checker();
-
-    let finder = Finder::new();
-
-    finder.find(binary_name, env::var_os("PATH"), cwd, binary_checker)
+    Finder::new().find(
+        binary_name,
+        env::var_os("PATH"),
+        cwd,
+        CompositeChecker::new(),
+        Noop,
+    )
 }
 
 /// Find all binaries with `binary_name` ignoring `cwd`.
 pub fn which_all_global<T: AsRef<OsStr>>(
     binary_name: T,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    let binary_checker = build_binary_checker();
-
-    let finder = Finder::new();
-
-    finder.find(
+    Finder::new().find(
         binary_name,
         env::var_os("PATH"),
         Option::<&Path>::None,
-        binary_checker,
+        CompositeChecker::new(),
+        Noop,
     )
 }
 
@@ -189,29 +188,21 @@ pub fn which_re_in<T>(
 where
     T: AsRef<OsStr>,
 {
-    let binary_checker = build_binary_checker();
-
-    let finder = Finder::new();
-
-    finder.find_re(regex, paths, binary_checker)
+    Finder::new().find_re(regex, paths, CompositeChecker::new(), Noop)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
-pub fn which_in_all<T, U, V>(
+pub fn which_in_all<'a, T, U, V>(
     binary_name: T,
     paths: Option<U>,
     cwd: V,
-) -> Result<impl Iterator<Item = path::PathBuf>>
+) -> Result<impl Iterator<Item = path::PathBuf> + 'a>
 where
     T: AsRef<OsStr>,
     U: AsRef<OsStr>,
-    V: AsRef<path::Path>,
+    V: AsRef<path::Path> + 'a,
 {
-    let binary_checker = build_binary_checker();
-
-    let finder = Finder::new();
-
-    finder.find(binary_name, paths, Some(cwd), binary_checker)
+    Finder::new().find(binary_name, paths, Some(cwd), CompositeChecker::new(), Noop)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, ignoring `cwd`.
@@ -223,34 +214,60 @@ where
     T: AsRef<OsStr>,
     U: AsRef<OsStr>,
 {
-    let binary_checker = build_binary_checker();
-
-    let finder = Finder::new();
-
-    finder.find(binary_name, paths, Option::<&Path>::None, binary_checker)
-}
-
-fn build_binary_checker() -> CompositeChecker {
-    CompositeChecker::new()
-        .add_checker(Box::new(ExistedChecker::new()))
-        .add_checker(Box::new(ExecutableChecker::new()))
+    Finder::new().find(
+        binary_name,
+        paths,
+        Option::<&Path>::None,
+        CompositeChecker::new(),
+        Noop,
+    )
 }
 
 /// A wrapper containing all functionality in this crate.
-pub struct WhichConfig {
+pub struct WhichConfig<F = Noop> {
     cwd: Option<either::Either<bool, path::PathBuf>>,
     custom_path_list: Option<OsString>,
     binary_name: Option<OsString>,
+    nonfatal_error_handler: F,
     #[cfg(feature = "regex")]
     regex: Option<Regex>,
 }
 
-impl Default for WhichConfig {
+/// A handler for non-fatal errors which does nothing with them.
+#[derive(Default, Debug, Clone)]
+pub struct Noop;
+
+/// Defines what should happen when a nonfatal error is encountered. A nonfatal error may represent a problem,
+/// but it doesn't necessarily require `which` to stop its search.
+///
+/// This trait is implemented for any closure or function that takes a single argument which is a [`NonFatalError`].
+/// You may also implement it for your own types.
+pub trait NonFatalErrorHandler {
+    fn handle(&mut self, e: NonFatalError);
+}
+
+impl NonFatalErrorHandler for Noop {
+    fn handle(&mut self, _: NonFatalError) {
+        // Do nothing
+    }
+}
+
+impl<T> NonFatalErrorHandler for T
+where
+    T: FnMut(NonFatalError),
+{
+    fn handle(&mut self, e: NonFatalError) {
+        (self)(e);
+    }
+}
+
+impl<F: Default> Default for WhichConfig<F> {
     fn default() -> Self {
         Self {
             cwd: Some(either::Either::Left(true)),
             custom_path_list: None,
             binary_name: None,
+            nonfatal_error_handler: F::default(),
             #[cfg(feature = "regex")]
             regex: None,
         }
@@ -263,11 +280,13 @@ type Regex = regex::Regex;
 #[cfg(not(feature = "regex"))]
 type Regex = ();
 
-impl WhichConfig {
+impl WhichConfig<Noop> {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
     /// Whether or not to use the current working directory. `true` by default.
     ///
     /// # Panics
@@ -352,6 +371,48 @@ impl WhichConfig {
         self
     }
 
+    /// Sets a closure that will receive non-fatal errors. You can also pass in other types
+    /// that implement [`NonFatalErrorHandler`].
+    ///
+    /// # Example
+    /// ```
+    /// # use which::WhichConfig;
+    /// let mut nonfatal_errors = Vec::new();
+    ///
+    /// WhichConfig::new()
+    ///     .binary_name("tar".into())
+    ///     .nonfatal_error_handler(|e| nonfatal_errors.push(e))
+    ///     .all_results()
+    ///     .unwrap()
+    ///     .collect::<Vec<_>>();
+    ///
+    /// if !nonfatal_errors.is_empty() {
+    ///     println!("nonfatal errors encountered: {nonfatal_errors:?}");
+    /// }
+    /// ```
+    ///
+    /// You could also log it if you choose
+    ///
+    /// ```
+    /// # use which::WhichConfig;
+    /// WhichConfig::new()
+    ///     .binary_name("tar".into())
+    ///     .nonfatal_error_handler(|e| eprintln!("{e}"))
+    ///     .all_results()
+    ///     .unwrap()
+    ///     .collect::<Vec<_>>();
+    /// ```
+    pub fn nonfatal_error_handler<NewF>(self, handler: NewF) -> WhichConfig<NewF> {
+        WhichConfig {
+            custom_path_list: self.custom_path_list,
+            cwd: self.cwd,
+            binary_name: self.binary_name,
+            nonfatal_error_handler: handler,
+            #[cfg(feature = "regex")]
+            regex: self.regex,
+        }
+    }
+
     /// Finishes configuring, runs the query and returns the first result.
     pub fn first_result(self) -> Result<path::PathBuf> {
         self.all_results()
@@ -359,18 +420,19 @@ impl WhichConfig {
     }
 
     /// Finishes configuring, runs the query and returns all results.
-    pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf>> {
-        let binary_checker = build_binary_checker();
-
-        let finder = Finder::new();
-
+    pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf> + 'a> {
         let paths = self.custom_path_list.or_else(|| env::var_os("PATH"));
 
         #[cfg(feature = "regex")]
         if let Some(regex) = self.regex {
-            return finder
-                .find_re(regex, paths, binary_checker)
-                .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf>>);
+            return Finder::new()
+                .find_re(
+                    regex,
+                    paths,
+                    CompositeChecker::new(),
+                    self.nonfatal_error_handler,
+                )
+                .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>);
         }
 
         let cwd = match self.cwd {
@@ -379,16 +441,17 @@ impl WhichConfig {
             None | Some(either::Either::Left(true)) => env::current_dir().ok(),
         };
 
-        finder
+        Finder::new()
             .find(
                 self.binary_name.expect(
                     "binary_name not set! You must set binary_name or regex before searching!",
                 ),
                 paths,
                 cwd,
-                binary_checker,
+                CompositeChecker::new(),
+                self.nonfatal_error_handler,
             )
-            .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf>>)
+            .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>)
     }
 }
 
@@ -439,15 +502,15 @@ impl Path {
     /// current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and maps the results into a `Path`.
-    pub fn all_in<T, U, V>(
+    pub fn all_in<'a, T, U, V>(
         binary_name: T,
         paths: Option<U>,
         cwd: V,
-    ) -> Result<impl Iterator<Item = Path>>
+    ) -> Result<impl Iterator<Item = Path> + 'a>
     where
         T: AsRef<OsStr>,
         U: AsRef<OsStr>,
-        V: AsRef<path::Path>,
+        V: AsRef<path::Path> + 'a,
     {
         which_in_all(binary_name, paths, cwd).map(|inner| inner.map(|inner| Path { inner }))
     }
@@ -564,15 +627,15 @@ impl CanonicalPath {
     /// using the current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
-    pub fn all_in<T, U, V>(
+    pub fn all_in<'a, T, U, V>(
         binary_name: T,
         paths: Option<U>,
         cwd: V,
-    ) -> Result<impl Iterator<Item = Result<CanonicalPath>>>
+    ) -> Result<impl Iterator<Item = Result<CanonicalPath>> + 'a>
     where
         T: AsRef<OsStr>,
         U: AsRef<OsStr>,
-        V: AsRef<path::Path>,
+        V: AsRef<path::Path> + 'a,
     {
         which_in_all(binary_name, paths, cwd).map(|inner| {
             inner.map(|inner| {
