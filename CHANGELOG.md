@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 7.0.0
+
+- Add support to `WhichConfig` for a user provided closure that will be called whenever a nonfatal error occurs.
+  This technically breaks a few APIs due to the need to add more generics and lifetimes. Most code will compile
+  without changes.
+
 ## 6.0.3
 
 - Enhance `tracing` feature with some `debug` level logs for higher level logic.
