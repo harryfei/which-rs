@@ -23,7 +23,7 @@ Here's an example of how to conditionally add `which`. You should tweak this to 
 
 ```toml
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
-which = "6.0.3"
+which = "7.0.0"
 ```
 
 ## Examples
