@@ -22,7 +22,7 @@ regex = { version = "1.10.2", optional = true }
 tracing = { version = "0.1.40", default-features = false, optional = true }
 
 [target.'cfg(any(windows, unix, target_os = "redox"))'.dependencies]
-home = "0.5.9"
+env_home = "0.1.0"
 
 [target.'cfg(any(unix, target_os = "wasi", target_os = "redox"))'.dependencies]
 rustix = { version = "0.38.30", default-features = false, features = ["fs", "std"] }
