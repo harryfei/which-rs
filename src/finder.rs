@@ -15,12 +15,12 @@ use std::fs;
 use std::iter;
 use std::path::{Component, Path, PathBuf};
 
-// Home dir shim, use home crate when possible. Otherwise, return None
+// Home dir shim, use env_home crate when possible. Otherwise, return None
 #[cfg(any(windows, unix, target_os = "redox"))]
-use home::home_dir;
+use env_home::env_home_dir;
 
 #[cfg(not(any(windows, unix, target_os = "redox")))]
-fn home_dir() -> Option<std::path::PathBuf> {
+fn env_home_dir() -> Option<std::path::PathBuf> {
     None
 }
 
@@ -266,7 +266,7 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
     let mut component_iter = p.components();
     if let Some(Component::Normal(o)) = component_iter.next() {
         if o == "~" {
-            let mut new_path = home_dir().unwrap_or_default();
+            let mut new_path = env_home_dir().unwrap_or_default();
             new_path.extend(component_iter);
             #[cfg(feature = "tracing")]
             tracing::trace!(
