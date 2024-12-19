@@ -266,20 +266,22 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
     let mut component_iter = p.components();
     if let Some(Component::Normal(o)) = component_iter.next() {
         if o == "~" {
-            let mut new_path = env_home_dir().unwrap_or_default();
-            new_path.extend(component_iter);
-            #[cfg(feature = "tracing")]
-            tracing::trace!(
-                "found tilde, substituting in user's home directory to get {}",
-                new_path.display()
-            );
-            Cow::Owned(new_path)
-        } else {
-            Cow::Borrowed(p)
+            let new_path = env_home_dir();
+            if let Some(mut new_path) = new_path {
+                new_path.extend(component_iter);
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "found tilde, substituting in user's home directory to get {}",
+                    new_path.display()
+                );
+                return Cow::Owned(new_path);
+            } else {
+                #[cfg(feature = "tracing")]
+                tracing::trace!("found tilde in path, but user's home directory couldn't be found");
+            }
         }
-    } else {
-        Cow::Borrowed(p)
     }
+    Cow::Borrowed(p)
 }
 
 #[cfg(target_os = "windows")]
