@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 7.0.1
+
+- Get user home directory from `env_home` instead of `home`. Thanks @micolous for this contribution!
+- If home directory is unavailable, do not expand the tilde to an empty string. Leave it as is.
+
 ## 7.0.0
 
 - Add support to `WhichConfig` for a user provided closure that will be called whenever a nonfatal error occurs.
