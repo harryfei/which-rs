@@ -2,7 +2,7 @@
 
 ## 7.0.1
 
-- Get user home directory from `env_home` instead of `home`. Thanks @micolous for this contribution!
+- Get user home directory from `env_home` instead of `home`. Thanks [@micolous](https://github.com/micolous) for this contribution!
 - If home directory is unavailable, do not expand the tilde to an empty string. Leave it as is.
 
 ## 7.0.0
