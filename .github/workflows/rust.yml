@@ -61,7 +61,11 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Build | Check
-        run: cargo check --workspace --target ${{ matrix.target }}
+        run: |
+          cargo check --workspace --target ${{ matrix.target }}
+          cargo check --workspace --target ${{ matrix.target }} --features regex
+          cargo check --workspace --target ${{ matrix.target }} --no-default-features
+          cargo check --workspace --target ${{ matrix.target }} --no-default-features --features regex
 
   # Run tests on Linux, macOS, and Windows
   # On both Rust stable and Rust nightly

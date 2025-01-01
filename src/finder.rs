@@ -1,28 +1,15 @@
 use crate::checker::CompositeChecker;
-#[cfg(windows)]
 use crate::helper::has_executable_extension;
+use crate::sys::Sys;
+use crate::sys::SysReadDirEntry;
 use crate::{error::*, NonFatalErrorHandler};
 use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
-#[cfg(feature = "regex")]
-use std::borrow::Borrow;
 use std::borrow::Cow;
-use std::env;
 use std::ffi::OsStr;
-#[cfg(any(feature = "regex", target_os = "windows"))]
-use std::fs;
 use std::iter;
 use std::path::{Component, Path, PathBuf};
-
-// Home dir shim, use env_home crate when possible. Otherwise, return None
-#[cfg(any(windows, unix, target_os = "redox"))]
-use env_home::env_home_dir;
-
-#[cfg(not(any(windows, unix, target_os = "redox")))]
-fn env_home_dir() -> Option<std::path::PathBuf> {
-    None
-}
 
 pub trait Checker {
     fn is_valid<F: NonFatalErrorHandler>(
@@ -59,11 +46,13 @@ impl PathExt for PathBuf {
     }
 }
 
-pub struct Finder;
+pub struct Finder<TSys: Sys> {
+    sys: TSys,
+}
 
-impl Finder {
-    pub fn new() -> Finder {
-        Finder
+impl<TSys: Sys + 'static> Finder<TSys> {
+    pub fn new(sys: TSys) -> Self {
+        Finder { sys }
     }
 
     pub fn find<'a, T, U, V, F: NonFatalErrorHandler + 'a>(
@@ -71,7 +60,7 @@ impl Finder {
         binary_name: T,
         paths: Option<U>,
         cwd: Option<V>,
-        binary_checker: CompositeChecker,
+        binary_checker: CompositeChecker<TSys>,
         mut nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf> + 'a>
     where
@@ -89,6 +78,7 @@ impl Finder {
             cwd.as_ref().map(|p| p.as_ref().display())
         );
 
+        let sys = self.sys.clone();
         let binary_path_candidates = match cwd {
             Some(cwd) if path.has_separator() => {
                 #[cfg(feature = "tracing")]
@@ -97,25 +87,25 @@ impl Finder {
                     path.display()
                 );
                 // Search binary in cwd if the path have a path separator.
-                Either::Left(Self::cwd_search_candidates(path, cwd))
+                Either::Left(Self::cwd_search_candidates(sys.clone(), path, cwd))
             }
             _ => {
                 #[cfg(feature = "tracing")]
                 tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
-                let paths = env::split_paths(&paths).collect::<Vec<_>>();
+                let paths = sys.env_split_paths(paths.as_ref());
                 if paths.is_empty() {
                     return Err(Error::CannotGetCurrentDirAndPathListEmpty);
                 }
 
-                Either::Right(Self::path_search_candidates(path, paths))
+                Either::Right(Self::path_search_candidates(sys.clone(), path, paths))
             }
         };
         let ret = binary_path_candidates.into_iter().filter_map(move |p| {
             binary_checker
                 .is_valid(&p, &mut nonfatal_error_handler)
-                .then(|| correct_casing(p, &mut nonfatal_error_handler))
+                .then(|| correct_casing(&sys, p, &mut nonfatal_error_handler))
         });
         #[cfg(feature = "tracing")]
         let ret = ret.inspect(|p| {
@@ -127,9 +117,9 @@ impl Finder {
     #[cfg(feature = "regex")]
     pub fn find_re<T, F: NonFatalErrorHandler>(
         &self,
-        binary_regex: impl Borrow<Regex>,
+        binary_regex: impl std::borrow::Borrow<Regex>,
         paths: Option<T>,
-        binary_checker: CompositeChecker,
+        binary_checker: CompositeChecker<TSys>,
         mut nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf>>
     where
@@ -141,9 +131,10 @@ impl Finder {
         #[allow(clippy::needless_collect)]
         let paths: Vec<_> = env::split_paths(&p).collect();
 
+        let sys = self.sys.clone();
         let matching_re = paths
             .into_iter()
-            .flat_map(fs::read_dir)
+            .flat_map(move |p| sys.read_dir(&p))
             .flatten()
             .flatten()
             .map(|e| e.path())
@@ -159,39 +150,36 @@ impl Finder {
         Ok(matching_re)
     }
 
-    fn cwd_search_candidates<C>(binary_name: PathBuf, cwd: C) -> impl IntoIterator<Item = PathBuf>
+    fn cwd_search_candidates<C>(
+        sys: TSys,
+        binary_name: PathBuf,
+        cwd: C,
+    ) -> impl IntoIterator<Item = PathBuf>
     where
         C: AsRef<Path>,
     {
         let path = binary_name.to_absolute(cwd);
 
-        Self::append_extension(iter::once(path))
+        Self::append_extension(sys, iter::once(path))
     }
 
     fn path_search_candidates<P>(
+        sys: TSys,
         binary_name: PathBuf,
         paths: P,
     ) -> impl IntoIterator<Item = PathBuf>
     where
         P: IntoIterator<Item = PathBuf>,
     {
-        let new_paths = paths
-            .into_iter()
-            .map(move |p| tilde_expansion(&p).join(binary_name.clone()));
+        let new_paths = paths.into_iter().map({
+            let sys = sys.clone();
+            move |p| tilde_expansion(&sys, &p).join(binary_name.clone())
+        });
 
-        Self::append_extension(new_paths)
+        Self::append_extension(sys, new_paths)
     }
 
-    #[cfg(not(windows))]
-    fn append_extension<P>(paths: P) -> impl IntoIterator<Item = PathBuf>
-    where
-        P: IntoIterator<Item = PathBuf>,
-    {
-        paths
-    }
-
-    #[cfg(windows)]
-    fn append_extension<P>(paths: P) -> impl IntoIterator<Item = PathBuf>
+    fn append_extension<P>(sys: TSys, paths: P) -> impl IntoIterator<Item = PathBuf>
     where
         P: IntoIterator<Item = PathBuf>,
     {
@@ -206,8 +194,13 @@ impl Finder {
         paths
             .into_iter()
             .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
-                let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-                    env::var("PATHEXT")
+                if !sys.is_windows() {
+                    return Box::new(iter::once(p));
+                }
+
+                let sys = sys.clone();
+                let path_extensions = PATH_EXTENSIONS.get_or_init(move || {
+                    sys.env_var("PATHEXT")
                         .map(|pathext| {
                             pathext
                                 .split(';')
@@ -262,11 +255,11 @@ impl Finder {
     }
 }
 
-fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
+fn tilde_expansion<'a, TSys: Sys>(sys: &TSys, p: &'a PathBuf) -> Cow<'a, PathBuf> {
     let mut component_iter = p.components();
     if let Some(Component::Normal(o)) = component_iter.next() {
         if o == "~" {
-            let new_path = env_home_dir();
+            let new_path = sys.home_dir();
             if let Some(mut new_path) = new_path {
                 new_path.extend(component_iter);
                 #[cfg(feature = "tracing")]
@@ -284,33 +277,30 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
     Cow::Borrowed(p)
 }
 
-#[cfg(target_os = "windows")]
-fn correct_casing<F: NonFatalErrorHandler>(
+fn correct_casing<TSys: Sys, F: NonFatalErrorHandler>(
+    sys: &TSys,
     mut p: PathBuf,
     nonfatal_error_handler: &mut F,
 ) -> PathBuf {
-    if let (Some(parent), Some(file_name)) = (p.parent(), p.file_name()) {
-        if let Ok(iter) = fs::read_dir(parent) {
-            for e in iter {
-                match e {
-                    Ok(e) => {
-                        if e.file_name().eq_ignore_ascii_case(file_name) {
-                            p.pop();
-                            p.push(e.file_name());
-                            break;
+    if sys.is_windows() {
+        if let (Some(parent), Some(file_name)) = (p.parent(), p.file_name()) {
+            if let Ok(iter) = sys.read_dir(parent) {
+                for e in iter {
+                    match e {
+                        Ok(e) => {
+                            if e.file_name().eq_ignore_ascii_case(file_name) {
+                                p.pop();
+                                p.push(e.file_name());
+                                break;
+                            }
                         }
-                    }
-                    Err(e) => {
-                        nonfatal_error_handler.handle(NonFatalError::Io(e));
+                        Err(e) => {
+                            nonfatal_error_handler.handle(NonFatalError::Io(e));
+                        }
                     }
                 }
             }
         }
     }
-    p
-}
-
-#[cfg(not(target_os = "windows"))]
-fn correct_casing<F: NonFatalErrorHandler>(p: PathBuf, _nonfatal_error_handler: &mut F) -> PathBuf {
     p
 }
