@@ -6,12 +6,16 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub trait SysReadDirEntry {
+    /// Gets the file name of the directory entry, not the full path.
     fn file_name(&self) -> OsString;
+    /// Gets the full path of the directory entry.
     fn path(&self) -> PathBuf;
 }
 
 pub trait SysMetadata {
+    /// Gets if the path is a symlink.
     fn is_symlink(&self) -> bool;
+    /// Gets if the path is a file.
     fn is_file(&self) -> bool;
 }
 
@@ -19,10 +23,18 @@ pub trait Sys: Clone {
     type ReadDirEntry: SysReadDirEntry;
     type Metadata: SysMetadata;
 
+    /// Check if the current platform is Windows.
+    ///
+    /// This can be set to true in wasm32-unknown-unknown targets that
+    /// are running on Windows systems.
     fn is_windows(&self) -> bool;
+    /// Gets the current working directory.
     fn current_dir(&self) -> io::Result<PathBuf>;
+    /// Gets the home directory of the current user.
     fn home_dir(&self) -> Option<PathBuf>;
+    /// Splits a platform-specific PATH variable into a list of paths.
     fn env_split_paths(&self, paths: &OsStr) -> Vec<PathBuf>;
+    /// Gets the value of an environment variable.
     fn env_var_os(&self, name: &str) -> Option<OsString>;
     fn env_var(&self, key: &str) -> Result<String, VarError> {
         match self.env_var_os(key) {
@@ -30,16 +42,19 @@ pub trait Sys: Clone {
             None => Err(VarError::NotPresent),
         }
     }
+    /// Gets the metadata of the provided path, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Self::Metadata>;
+    /// Gets the metadata of the provided path, not following symlinks.
     fn symlink_metadata(&self, path: &Path) -> io::Result<Self::Metadata>;
+    /// Reads the directory entries of the provided path.
     fn read_dir(
         &self,
         path: &Path,
     ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>>;
+    /// Checks if the provided path is a valid executable.
     fn is_valid_executable(&self, path: &Path) -> io::Result<bool>;
 }
 
-#[cfg(feature = "real-sys")]
 impl SysReadDirEntry for std::fs::DirEntry {
     fn file_name(&self) -> OsString {
         self.file_name()
@@ -50,7 +65,6 @@ impl SysReadDirEntry for std::fs::DirEntry {
     }
 }
 
-#[cfg(feature = "real-sys")]
 impl SysMetadata for std::fs::Metadata {
     fn is_symlink(&self) -> bool {
         self.file_type().is_symlink()
