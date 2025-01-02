@@ -24,7 +24,7 @@ Here's an example of how to conditionally add `which`. You should tweak this to 
 which = "7.0.0"
 ```
 
-Note that you can disable the default features of this crate and provide a custom `which::sys::Sys` implementation to `which::WhichConfig` for use in Wasm environments without WASI.
+Note that non-WASI environments have no access to the system. Using this in that situation requires disabling the default features of this crate and providing a custom `which::sys::Sys` implementation to `which::WhichConfig`.
 
 ## Examples
 
