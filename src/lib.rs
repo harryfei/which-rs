@@ -147,7 +147,7 @@ pub fn which_all_global<T: AsRef<OsStr>>(
 pub fn which_re(
     regex: impl std::borrow::Borrow<Regex>,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    which_re_in(regex, env::var_os("PATH"))
+    which_re_in(regex, sys::RealSys.env_var_os("PATH"))
 }
 
 /// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.

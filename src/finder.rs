@@ -126,10 +126,7 @@ impl<TSys: Sys + 'static> Finder<TSys> {
         T: AsRef<OsStr>,
     {
         let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
-        // Collect needs to happen in order to not have to
-        // change the API to borrow on `paths`.
-        #[allow(clippy::needless_collect)]
-        let paths: Vec<_> = env::split_paths(&p).collect();
+        let paths = self.sys.env_split_paths(p.as_ref());
 
         let sys = self.sys.clone();
         let matching_re = paths
