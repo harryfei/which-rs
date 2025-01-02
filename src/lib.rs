@@ -20,18 +20,17 @@ mod checker;
 mod error;
 mod finder;
 mod helper;
-pub mod sys;
+mod sys;
 
 use std::fmt;
 use std::path;
 
 use std::ffi::{OsStr, OsString};
 
-use sys::Sys;
-
 use crate::checker::CompositeChecker;
 pub use crate::error::*;
 use crate::finder::Finder;
+pub use sys::*;
 
 /// Find an executable binary's path by name.
 ///

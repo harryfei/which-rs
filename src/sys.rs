@@ -157,6 +157,7 @@ impl Sys for RealSys {
 
         use rustix::fs as rfs;
         rfs::access(path, rfs::Access::EXEC_OK)
+            .map(|_| true)
             .map_err(|e| io::Error::from_raw_os_error(e.raw_os_error()))
     }
 

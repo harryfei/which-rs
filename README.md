@@ -32,14 +32,14 @@ WebAssembly without wasi does not have a filesystem, but using this crate is pos
 which = { version = "...", default-features = false }
 ```
 
-Then providing your own implementation of the `which::sys::Sys` trait:
+Then providing your own implementation of the `which::Sys` trait:
 
 ```rs
 use which::WhichConfig;
 
 struct WasmSys;
 
-impl which::sys::Sys for WasmSys {
+impl which::Sys for WasmSys {
     // it is up to you to implement this trait based on the
     // environment you are running WebAssembly in
 }
