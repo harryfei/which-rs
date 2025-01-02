@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 extern crate which;
 
 #[cfg(all(unix, feature = "regex"))]
