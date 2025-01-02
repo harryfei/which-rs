@@ -13,17 +13,41 @@ A Rust equivalent of Unix command "which". Locate installed executable in cross 
 
 ### A note on WebAssembly
 
-This project aims to support WebAssembly with the [wasi](https://wasi.dev/) extension. This extension is a requirement. `which` is a library for exploring a filesystem, and
-WebAssembly without wasi does not have a filesystem. `which` cannot do anything useful without this extension. Issues and PRs relating to
-`wasm32-unknown-unknown` and `wasm64-unknown-unknown` will not be resolved or merged. All `wasm32-wasi*` targets are officially supported.
+This project aims to support WebAssembly with the [wasi](https://wasi.dev/) extension. All `wasm32-wasi*` targets are officially supported.
 
-If you need to add a conditional dependency on `which` for this reason please refer to [the relevant cargo documentation for platform specific dependencies.](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies)
+If you need to add a conditional dependency on `which` please refer to [the relevant cargo documentation for platform specific dependencies.](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies)
 
 Here's an example of how to conditionally add `which`. You should tweak this to your needs.
 
 ```toml
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
 which = "7.0.0"
+```
+
+### How to use in `wasm32-unknown-unknown`
+
+WebAssembly without wasi does not have a filesystem, but using this crate is possible in `wasm32-unknown-unknown` targets by disabling default features:
+
+```toml
+which = { version = "...", default-features = false }
+```
+
+Then providing your own implementation of the `which::sys::Sys` trait:
+
+```rs
+use which::WhichConfig;
+
+struct WasmSys;
+
+impl which::sys::Sys for WasmSys {
+    // it is up to you to implement this trait based on the
+    // environment you are running WebAssembly in
+}
+
+let paths = WhichConfig::new_with_sys(WasmSys)
+    .all_results()
+    .unwrap()
+    .collect::<Vec<_>>();
 ```
 
 ## Examples

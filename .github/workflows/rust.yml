@@ -48,7 +48,7 @@ jobs:
     name: Compile
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-musl, wasm32-wasi]
+        target: [x86_64-unknown-linux-musl, wasm32-wasi, wasm32-unknown-unknown]
     runs-on: ubuntu-latest
     steps:
       - name: Setup | Checkout
@@ -61,9 +61,16 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Build | Check
+        if: ${{ matrix.target != 'wasm32-unknown-unknown' }}
         run: |
           cargo check --workspace --target ${{ matrix.target }}
           cargo check --workspace --target ${{ matrix.target }} --features regex
+          cargo check --workspace --target ${{ matrix.target }} --no-default-features
+          cargo check --workspace --target ${{ matrix.target }} --no-default-features --features regex
+
+      - name: Check wasm32-unknown-unknown
+        if: ${{ matrix.target == 'wasm32-unknown-unknown' }}
+        run: |
           cargo check --workspace --target ${{ matrix.target }} --no-default-features
           cargo check --workspace --target ${{ matrix.target }} --no-default-features --features regex
 

@@ -305,6 +305,10 @@ impl WhichConfig<sys::RealSys, Noop> {
 }
 
 impl<TSys: Sys> WhichConfig<TSys, Noop> {
+    /// Creates a new `WhichConfig` with the given system.
+    ///
+    /// This is useful for providing all the system related
+    /// functionality to this crate.
     pub fn new_with_sys(sys: TSys) -> Self {
         Self {
             cwd: Some(either::Either::Left(true)),
