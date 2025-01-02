@@ -78,7 +78,6 @@ impl<TSys: Sys + 'static> Finder<TSys> {
             cwd.as_ref().map(|p| p.as_ref().display())
         );
 
-        let sys = self.sys.clone();
         let binary_path_candidates = match cwd {
             Some(cwd) if path.has_separator() => {
                 #[cfg(feature = "tracing")]
@@ -87,22 +86,27 @@ impl<TSys: Sys + 'static> Finder<TSys> {
                     path.display()
                 );
                 // Search binary in cwd if the path have a path separator.
-                Either::Left(Self::cwd_search_candidates(sys.clone(), path, cwd))
+                Either::Left(Self::cwd_search_candidates(&self.sys, path, cwd))
             }
             _ => {
                 #[cfg(feature = "tracing")]
                 tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
-                let paths = sys.env_split_paths(paths.as_ref());
+                let paths = self.sys.env_split_paths(paths.as_ref());
                 if paths.is_empty() {
                     return Err(Error::CannotGetCurrentDirAndPathListEmpty);
                 }
 
-                Either::Right(Self::path_search_candidates(sys.clone(), path, paths))
+                Either::Right(Self::path_search_candidates(
+                    &self.sys,
+                    path,
+                    paths.into_iter(),
+                ))
             }
         };
-        let ret = binary_path_candidates.into_iter().filter_map(move |p| {
+        let sys = self.sys.clone();
+        let ret = binary_path_candidates.filter_map(move |p| {
             binary_checker
                 .is_valid(&p, &mut nonfatal_error_handler)
                 .then(|| correct_casing(&sys, p, &mut nonfatal_error_handler))
@@ -148,10 +152,10 @@ impl<TSys: Sys + 'static> Finder<TSys> {
     }
 
     fn cwd_search_candidates<C>(
-        sys: TSys,
+        sys: &TSys,
         binary_name: PathBuf,
         cwd: C,
-    ) -> impl IntoIterator<Item = PathBuf>
+    ) -> impl Iterator<Item = PathBuf>
     where
         C: AsRef<Path>,
     {
@@ -161,14 +165,14 @@ impl<TSys: Sys + 'static> Finder<TSys> {
     }
 
     fn path_search_candidates<P>(
-        sys: TSys,
+        sys: &TSys,
         binary_name: PathBuf,
         paths: P,
-    ) -> impl IntoIterator<Item = PathBuf>
+    ) -> impl Iterator<Item = PathBuf>
     where
-        P: IntoIterator<Item = PathBuf>,
+        P: Iterator<Item = PathBuf>,
     {
-        let new_paths = paths.into_iter().map({
+        let new_paths = paths.map({
             let sys = sys.clone();
             move |p| tilde_expansion(&sys, &p).join(binary_name.clone())
         });
@@ -176,79 +180,79 @@ impl<TSys: Sys + 'static> Finder<TSys> {
         Self::append_extension(sys, new_paths)
     }
 
-    fn append_extension<P>(sys: TSys, paths: P) -> impl IntoIterator<Item = PathBuf>
+    fn append_extension<P>(sys: &TSys, paths: P) -> impl Iterator<Item = PathBuf>
     where
-        P: IntoIterator<Item = PathBuf>,
+        P: Iterator<Item = PathBuf>,
     {
-        use std::sync::OnceLock;
+        struct PathsIter<P>
+        where
+            P: Iterator<Item = PathBuf>,
+        {
+            paths: P,
+            current_path_with_index: Option<(PathBuf, usize)>,
+            path_extensions: Cow<'static, [String]>,
+        }
 
-        // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
-        // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
-        // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
-        // hence its retention.)
-        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
+        impl<P> Iterator for PathsIter<P>
+        where
+            P: Iterator<Item = PathBuf>,
+        {
+            type Item = PathBuf;
 
-        paths
-            .into_iter()
-            .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
-                if !sys.is_windows() {
-                    return Box::new(iter::once(p));
-                }
-
-                let sys = sys.clone();
-                let path_extensions = PATH_EXTENSIONS.get_or_init(move || {
-                    sys.env_var("PATHEXT")
-                        .map(|pathext| {
-                            pathext
-                                .split(';')
-                                .filter_map(|s| {
-                                    if s.as_bytes().first() == Some(&b'.') {
-                                        Some(s.to_owned())
-                                    } else {
-                                        // Invalid segment; just ignore it.
-                                        None
-                                    }
-                                })
-                                .collect()
-                        })
-                        // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                        // improbable and would probably break Windows badly. Still, don't crash:
-                        .unwrap_or_default()
-                });
-                // Check if path already have executable extension
-                if has_executable_extension(&p, path_extensions) {
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.path_extensions.is_empty() {
+                    self.paths.next()
+                } else if let Some((p, index)) = self.current_path_with_index.take() {
+                    let next_index = index + 1;
+                    if next_index < self.path_extensions.len() {
+                        self.current_path_with_index = Some((p.clone(), next_index));
+                    }
+                    // Append the extension.
+                    let mut p = p.into_os_string();
+                    p.push(&self.path_extensions[index]);
+                    let ret = PathBuf::from(p);
                     #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} already has an executable extension, not modifying it further",
-                        p.display()
-                    );
-                    Box::new(iter::once(p))
+                    tracing::trace!("possible extension: {}", ret.display());
+                    Some(ret)
                 } else {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} has no extension, using PATHEXT environment variable to infer one",
-                        p.display()
-                    );
-                    // Appended paths with windows executable extensions.
-                    // e.g. path `c:/windows/bin[.ext]` will expand to:
-                    // [c:/windows/bin.ext]
-                    // c:/windows/bin[.ext].COM
-                    // c:/windows/bin[.ext].EXE
-                    // c:/windows/bin[.ext].CMD
-                    // ...
-                    Box::new(
-                        iter::once(p.clone()).chain(path_extensions.iter().map(move |e| {
-                            // Append the extension.
-                            let mut p = p.clone().into_os_string();
-                            p.push(e);
-                            let ret = PathBuf::from(p);
-                            #[cfg(feature = "tracing")]
-                            tracing::trace!("possible extension: {}", ret.display());
-                            ret
-                        })),
-                    )
+                    let p = self.paths.next()?;
+                    if has_executable_extension(&p, &self.path_extensions) {
+                        #[cfg(feature = "tracing")]
+                        tracing::trace!(
+                            "{} already has an executable extension, not modifying it further",
+                            p.display()
+                        );
+                    } else {
+                        #[cfg(feature = "tracing")]
+                        tracing::trace!(
+                            "{} has no extension, using PATHEXT environment variable to infer one",
+                            p.display()
+                        );
+                        // Appended paths with windows executable extensions.
+                        // e.g. path `c:/windows/bin[.ext]` will expand to:
+                        // [c:/windows/bin.ext]
+                        // c:/windows/bin[.ext].COM
+                        // c:/windows/bin[.ext].EXE
+                        // c:/windows/bin[.ext].CMD
+                        // ...
+                        self.current_path_with_index = Some((p.clone(), 0));
+                    }
+                    Some(p)
                 }
-            })
+            }
+        }
+
+        let path_extensions = if sys.is_windows() {
+            sys.env_windows_path_ext()
+        } else {
+            Cow::Borrowed(Default::default())
+        };
+
+        PathsIter {
+            paths,
+            current_path_with_index: None,
+            path_extensions,
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::env::VarError;
 use std::ffi::OsStr;
 use std::ffi::OsString;
@@ -19,6 +20,34 @@ pub trait SysMetadata {
     fn is_file(&self) -> bool;
 }
 
+/// Represents the system that `which` interacts with to get information
+/// about the environment and file system.
+///
+/// ### How to use in Wasm without WASI
+///
+/// WebAssembly without WASI does not have a filesystem, but using this crate is possible in `wasm32-unknown-unknown` targets by disabling default features:
+///
+/// ```toml
+/// which = { version = "...", default-features = false }
+/// ```
+///
+// Then providing your own implementation of the `which::sys::Sys` trait:
+///
+/// ```rs
+/// use which::WhichConfig;
+///
+/// struct WasmSys;
+///
+/// impl which::sys::Sys for WasmSys {
+///     // it is up to you to implement this trait based on the
+///     // environment you are running WebAssembly in
+/// }
+///
+/// let paths = WhichConfig::new_with_sys(WasmSys)
+///     .all_results()
+///     .unwrap()
+///     .collect::<Vec<_>>();
+/// ```
 pub trait Sys: Clone {
     type ReadDirEntry: SysReadDirEntry;
     type Metadata: SysMetadata;
@@ -41,6 +70,38 @@ pub trait Sys: Clone {
             Some(val) => val.into_string().map_err(VarError::NotUnicode),
             None => Err(VarError::NotPresent),
         }
+    }
+    /// Gets and parses the PATHEXT environment variable on Windows.
+    ///
+    /// Override this to disable globally caching the parsed PATHEXT.
+    fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
+        use std::sync::OnceLock;
+
+        // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+        // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
+        // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
+        // hence its retention.)
+        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
+        let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
+            self.env_var("PATHEXT")
+                .map(|pathext| {
+                    pathext
+                        .split(';')
+                        .filter_map(|s| {
+                            if s.as_bytes().first() == Some(&b'.') {
+                                Some(s.to_owned())
+                            } else {
+                                // Invalid segment; just ignore it.
+                                None
+                            }
+                        })
+                        .collect()
+                })
+                // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                // improbable and would probably break Windows badly. Still, don't crash:
+                .unwrap_or_default()
+        });
+        Cow::Borrowed(path_extensions)
     }
     /// Gets the metadata of the provided path, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Self::Metadata>;

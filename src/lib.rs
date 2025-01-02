@@ -20,7 +20,7 @@ mod checker;
 mod error;
 mod finder;
 mod helper;
-mod sys;
+pub mod sys;
 
 use std::fmt;
 use std::path;
@@ -30,7 +30,7 @@ use std::ffi::{OsStr, OsString};
 use crate::checker::CompositeChecker;
 pub use crate::error::*;
 use crate::finder::Finder;
-pub use sys::*;
+use crate::sys::Sys;
 
 /// Find an executable binary's path by name.
 ///
@@ -304,7 +304,7 @@ impl WhichConfig<sys::RealSys, Noop> {
 }
 
 impl<TSys: Sys> WhichConfig<TSys, Noop> {
-    /// Creates a new `WhichConfig` with the given system.
+    /// Creates a new `WhichConfig` with the given `sys::Sys`.
     ///
     /// This is useful for providing all the system related
     /// functionality to this crate.
