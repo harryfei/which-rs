@@ -153,8 +153,6 @@ impl Sys for RealSys {
 
     #[cfg(any(unix, target_os = "wasi", target_os = "redox"))]
     fn is_valid_executable(&self, path: &Path) -> io::Result<bool> {
-        use std::io;
-
         use rustix::fs as rfs;
         rfs::access(path, rfs::Access::EXEC_OK)
             .map(|_| true)
