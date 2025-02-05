@@ -124,6 +124,9 @@ impl TestFixture {
 fn _which<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<which::CanonicalPath> {
     which::CanonicalPath::new_in(path, Some(f.paths.clone()), f.tempdir.path())
 }
+fn _which_uncanonicalized<T: AsRef<OsStr>>(f: &TestFixture, path: T) -> which::Result<PathBuf> {
+    which::which_in(path, Some(f.paths.clone()), f.tempdir.path())
+}
 
 fn _which_all<'a, T: AsRef<OsStr> + 'a>(
     f: &'a TestFixture,
@@ -408,6 +411,21 @@ fn test_which_relative_leading_dot() {
     assert_eq!(
         _which(&f, "./b/bin").unwrap(),
         f.bins[4].canonicalize().unwrap()
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_which_relative_leading_dot_uncanonicalized() {
+    let f = TestFixture::new();
+
+    let actual = _which_uncanonicalized(&f, "./b/bin").unwrap();
+    assert_eq!(actual, f.bins[3].canonicalize().unwrap());
+
+    assert!(
+        !actual.display().to_string().contains("/./"),
+        "'{}' should not contain a CurDir component",
+        actual.display()
     );
 }
 

@@ -53,7 +53,10 @@ impl PathExt for PathBuf {
             self
         } else {
             let mut new_path = PathBuf::from(cwd.as_ref());
-            new_path.push(self);
+            new_path.extend(
+                self.components()
+                    .skip_while(|c| matches!(c, Component::CurDir)),
+            );
             new_path
         }
     }
