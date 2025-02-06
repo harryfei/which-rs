@@ -415,7 +415,7 @@ fn test_which_relative_leading_dot() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn test_which_relative_leading_dot_uncanonicalized() {
     let f = TestFixture::new();
 
