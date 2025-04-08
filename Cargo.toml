@@ -1,6 +1,6 @@
 [package]
 name = "which"
-version = "7.0.2"
+version = "7.0.3"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Harry Fei <tiziyuanfang@gmail.com>, Jacob Kiesel <jake@bitcrafters.co>"]

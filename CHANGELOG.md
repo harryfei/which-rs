@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 7.0.3
+
+- Update rustix to version 1.0. Congrats to rustix on this milestone, and thanks [@mhils](https://github.com/mhils) for this contribution to which!
+
 ## 7.0.2
 
 - Don't return paths containing the single dot `.` reference to the current directory, even if the original request was given in
