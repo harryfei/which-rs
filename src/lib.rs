@@ -165,7 +165,7 @@ where
 ///
 /// * `regex` - A regular expression to match binaries with
 /// * `paths` - A string containing the paths to search
-///             (separated in the same way as the PATH environment variable)
+///   (separated in the same way as the PATH environment variable)
 ///
 /// # Examples
 ///
