@@ -111,7 +111,7 @@ pub trait Sys: Clone {
     fn read_dir(
         &self,
         path: &Path,
-    ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>>;
+    ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>> + '_>>;
     /// Checks if the provided path is a valid executable.
     fn is_valid_executable(&self, path: &Path) -> io::Result<bool>;
 }
