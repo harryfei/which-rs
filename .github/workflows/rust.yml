@@ -48,7 +48,7 @@ jobs:
     name: Compile
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-musl, wasm32-wasi, wasm32-unknown-unknown]
+        target: [x86_64-unknown-linux-musl, wasm32-wasip1, wasm32-unknown-unknown]
     runs-on: ubuntu-latest
     steps:
       - name: Setup | Checkout

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 7.0.3
+
+- Update rustix to version 1.0. Congrats to rustix on this milestone, and thanks [@mhils](https://github.com/mhils) for this contribution to which!
+
+## 7.0.2
+
+- Don't return paths containing the single dot `.` reference to the current directory, even if the original request was given in
+terms of the current directory. Thanks [@jakobhellermann](https://github.com/jakobhellermann) for this contribution!
+
 ## 7.0.1
 
 - Get user home directory from `env_home` instead of `home`. Thanks [@micolous](https://github.com/micolous) for this contribution!
