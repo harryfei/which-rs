@@ -259,7 +259,7 @@ impl<TSys: Sys + 'static> Finder<TSys> {
     }
 }
 
-fn tilde_expansion<'a, TSys: Sys>(sys: &TSys, p: &'a PathBuf) -> Cow<'a, PathBuf> {
+fn tilde_expansion<'a, TSys: Sys>(sys: &TSys, p: &'a Path) -> Cow<'a, Path> {
     let mut component_iter = p.components();
     if let Some(Component::Normal(o)) = component_iter.next() {
         if o == "~" {
