@@ -74,7 +74,7 @@ pub trait Sys: Clone {
     /// Gets and parses the PATHEXT environment variable on Windows.
     ///
     /// Override this to disable globally caching the parsed PATHEXT.
-    /// 
+    ///
     /// Note: This will only be called when `is_windows()` returns `true`
     /// and isn't conditionally compiled with `#[cfg(windows)]` so that it
     /// can work in Wasm.
