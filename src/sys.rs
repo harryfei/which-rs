@@ -56,9 +56,7 @@ pub trait Sys: Clone {
     ///
     /// This can be set to true in wasm32-unknown-unknown targets that
     /// are running on Windows systems.
-    fn is_windows(&self) -> bool {
-        cfg!(windows)
-    }
+    fn is_windows(&self) -> bool;
     /// Gets the current working directory.
     fn current_dir(&self) -> io::Result<PathBuf>;
     /// Gets the home directory of the current user.
