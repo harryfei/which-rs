@@ -56,7 +56,9 @@ pub trait Sys: Clone {
     ///
     /// This can be set to true in wasm32-unknown-unknown targets that
     /// are running on Windows systems.
-    fn is_windows(&self) -> bool;
+    fn is_windows(&self) -> bool {
+        cfg!(windows)
+    }
     /// Gets the current working directory.
     fn current_dir(&self) -> io::Result<PathBuf>;
     /// Gets the home directory of the current user.
@@ -64,8 +66,8 @@ pub trait Sys: Clone {
     /// Splits a platform-specific PATH variable into a list of paths.
     fn env_split_paths(&self, paths: &OsStr) -> Vec<PathBuf>;
     /// Gets the value of an environment variable.
-    fn env_var_os(&self, name: &str) -> Option<OsString>;
-    fn env_var(&self, key: &str) -> Result<String, VarError> {
+    fn env_var_os(&self, name: &OsStr) -> Option<OsString>;
+    fn env_var(&self, key: &OsStr) -> Result<String, VarError> {
         match self.env_var_os(key) {
             Some(val) => val.into_string().map_err(VarError::NotUnicode),
             None => Err(VarError::NotPresent),
@@ -87,7 +89,7 @@ pub trait Sys: Clone {
         // hence its retention.)
         static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
         let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-            self.env_var("PATHEXT")
+            self.env_var(OsStr::new("PATHEXT"))
                 .map(|pathext| {
                     pathext
                         .split(';')
@@ -189,7 +191,7 @@ impl Sys for RealSys {
     }
 
     #[inline]
-    fn env_var_os(&self, name: &str) -> Option<OsString> {
+    fn env_var_os(&self, name: &OsStr) -> Option<OsString> {
         #[allow(clippy::disallowed_methods)] // ok, sys implementation
         std::env::var_os(name)
     }

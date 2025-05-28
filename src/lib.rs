@@ -90,7 +90,7 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
 
     Finder::new(sys::RealSys).find(
         binary_name,
-        sys::RealSys.env_var_os("PATH"),
+        sys::RealSys.env_var_os(OsStr::new("PATH")),
         cwd,
         CompositeChecker::new(sys::RealSys),
         Noop,
@@ -104,7 +104,7 @@ pub fn which_all_global<T: AsRef<OsStr>>(
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
     Finder::new(sys::RealSys).find(
         binary_name,
-        sys::RealSys.env_var_os("PATH"),
+        sys::RealSys.env_var_os(OsStr::new("PATH")),
         Option::<&Path>::None,
         CompositeChecker::new(sys::RealSys),
         Noop,
@@ -147,7 +147,7 @@ pub fn which_all_global<T: AsRef<OsStr>>(
 pub fn which_re(
     regex: impl std::borrow::Borrow<Regex>,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    which_re_in(regex, sys::RealSys.env_var_os("PATH"))
+    which_re_in(regex, sys::RealSys.env_var_os(OsStr::new("PATH")))
 }
 
 /// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
@@ -459,7 +459,7 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf> + 'a> {
         let paths = self
             .custom_path_list
-            .or_else(|| self.sys.env_var_os("PATH"));
+            .or_else(|| self.sys.env_var_os(OsStr::new("PATH")));
 
         #[cfg(feature = "regex")]
         if let Some(regex) = self.regex {
