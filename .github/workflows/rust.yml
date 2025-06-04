@@ -97,6 +97,9 @@ jobs:
       # Run the ignored tests that expect the above setup
       - name: Build | Test
         run: cargo test --workspace --all-features -- --include-ignored
+
+      - name: Test (no default features)
+        run: cargo test --workspace --no-default-features
   cargo-deny:
     runs-on: ubuntu-22.04
     steps:

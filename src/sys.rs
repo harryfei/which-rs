@@ -79,11 +79,13 @@ pub trait Sys: Clone {
     /// and isn't conditionally compiled with `#[cfg(windows)]` so that it
     /// can work in Wasm.
     fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
-        Cow::Owned(self.env_var(OsStr::new("PATHEXT"))
-            .map(|pathext| { parse_path_ext(&pathext) })
-            // PATHEXT not being set or not being a proper Unicode string is exceedingly
-            // improbable and would probably break Windows badly. Still, don't crash:
-            .unwrap_or_default())
+        Cow::Owned(
+            self.env_var(OsStr::new("PATHEXT"))
+                .map(|pathext| parse_path_ext(&pathext))
+                // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                // improbable and would probably break Windows badly. Still, don't crash:
+                .unwrap_or_default(),
+        )
     }
     /// Gets the metadata of the provided path, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Self::Metadata>;
@@ -233,14 +235,14 @@ impl Sys for RealSys {
 
 fn parse_path_ext(pathext: &str) -> Vec<String> {
     pathext
-    .split(';')
-    .filter_map(|s| {
-        if s.as_bytes().first() == Some(&b'.') {
-            Some(s.to_owned())
-        } else {
-            // Invalid segment; just ignore it.
-            None
-        }
-    })
-    .collect()
+        .split(';')
+        .filter_map(|s| {
+            if s.as_bytes().first() == Some(&b'.') {
+                Some(s.to_owned())
+            } else {
+                // Invalid segment; just ignore it.
+                None
+            }
+        })
+        .collect()
 }

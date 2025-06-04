@@ -6,12 +6,14 @@
 //! To find which rustc executable binary is using:
 //!
 //! ```no_run
+//! # #[cfg(feature = "real-sys")]
+//! # {
 //! use which::which;
 //! use std::path::PathBuf;
 //!
 //! let result = which("rustc").unwrap();
 //! assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
-//!
+//! # }
 //! ```
 
 #![forbid(unsafe_code)]
@@ -411,6 +413,8 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     ///
     /// # Example
     /// ```
+    /// # #[cfg(feature = "real-sys")]
+    /// # {
     /// # use which::WhichConfig;
     /// let mut nonfatal_errors = Vec::new();
     ///
@@ -424,11 +428,14 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     /// if !nonfatal_errors.is_empty() {
     ///     println!("nonfatal errors encountered: {nonfatal_errors:?}");
     /// }
+    /// # }
     /// ```
     ///
     /// You could also log it if you choose
     ///
     /// ```
+    /// # #[cfg(feature = "real-sys")]
+    /// # {
     /// # use which::WhichConfig;
     /// WhichConfig::new()
     ///     .binary_name("tar".into())
@@ -436,6 +443,7 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     ///     .all_results()
     ///     .unwrap()
     ///     .collect::<Vec<_>>();
+    /// # }
     /// ```
     pub fn nonfatal_error_handler<NewF>(self, handler: NewF) -> WhichConfig<TSys, NewF> {
         WhichConfig {
