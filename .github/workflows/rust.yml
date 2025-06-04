@@ -65,11 +65,8 @@ jobs:
         run: |
           cargo check --workspace --target ${{ matrix.target }}
           cargo check --workspace --target ${{ matrix.target }} --features regex
-          cargo check --workspace --target ${{ matrix.target }} --no-default-features
-          cargo check --workspace --target ${{ matrix.target }} --no-default-features --features regex
 
-      - name: Check wasm32-unknown-unknown
-        if: ${{ matrix.target == 'wasm32-unknown-unknown' }}
+      - name: Build | Check (no default features)
         run: |
           cargo check --workspace --target ${{ matrix.target }} --no-default-features
           cargo check --workspace --target ${{ matrix.target }} --no-default-features --features regex
@@ -98,7 +95,7 @@ jobs:
       - name: Build | Test
         run: cargo test --workspace --all-features -- --include-ignored
 
-      - name: Test (no default features)
+      - name: Build | Test (no default features)
         run: cargo test --workspace --no-default-features
   cargo-deny:
     runs-on: ubuntu-22.04

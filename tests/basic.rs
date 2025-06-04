@@ -807,7 +807,8 @@ mod in_memory {
                         .collect::<Vec<_>>();
                     Ok(Box::new(entries.into_iter()))
                 }
-                _ => Err(Error::new(ErrorKind::NotADirectory, "Not a directory")),
+                // should use ErrorKind::NotADirectory once upgrading rust version
+                _ => Err(Error::new(ErrorKind::Other, "Not a directory")),
             }
         }
 
