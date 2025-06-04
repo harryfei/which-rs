@@ -73,39 +73,17 @@ pub trait Sys: Clone {
     }
     /// Gets and parses the PATHEXT environment variable on Windows.
     ///
-    /// Override this to disable globally caching the parsed PATHEXT.
+    /// Override this to enable caching the parsed PATHEXT.
     ///
     /// Note: This will only be called when `is_windows()` returns `true`
     /// and isn't conditionally compiled with `#[cfg(windows)]` so that it
     /// can work in Wasm.
     fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
-        use std::sync::OnceLock;
-
-        // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
-        // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
-        // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
-        // hence its retention.)
-        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
-        let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-            self.env_var(OsStr::new("PATHEXT"))
-                .map(|pathext| {
-                    pathext
-                        .split(';')
-                        .filter_map(|s| {
-                            if s.as_bytes().first() == Some(&b'.') {
-                                Some(s.to_owned())
-                            } else {
-                                // Invalid segment; just ignore it.
-                                None
-                            }
-                        })
-                        .collect()
-                })
-                // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                // improbable and would probably break Windows badly. Still, don't crash:
-                .unwrap_or_default()
-        });
-        Cow::Borrowed(path_extensions)
+        Cow::Owned(self.env_var(OsStr::new("PATHEXT"))
+            .map(|pathext| { parse_path_ext(&pathext) })
+            // PATHEXT not being set or not being a proper Unicode string is exceedingly
+            // improbable and would probably break Windows badly. Still, don't crash:
+            .unwrap_or_default())
     }
     /// Gets the metadata of the provided path, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Self::Metadata>;
@@ -160,6 +138,9 @@ impl Sys for RealSys {
 
     #[inline]
     fn is_windows(&self) -> bool {
+        // Again, do not change the code to directly use `#[cfg(windows)]`
+        // because we want to allow people to implement this code in Wasm
+        // and then tell at runtime if running on a Windows system.
         cfg!(windows)
     }
 
@@ -186,6 +167,24 @@ impl Sys for RealSys {
     fn env_split_paths(&self, paths: &OsStr) -> Vec<PathBuf> {
         #[allow(clippy::disallowed_methods)] // ok, sys implementation
         std::env::split_paths(paths).collect()
+    }
+
+    fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
+        use std::sync::OnceLock;
+
+        // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+        // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
+        // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
+        // hence its retention.)
+        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
+        let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
+            self.env_var(OsStr::new("PATHEXT"))
+                .map(|s| parse_path_ext(&s))
+                // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                // improbable and would probably break Windows badly. Still, don't crash:
+                .unwrap_or_default()
+        });
+        Cow::Borrowed(path_extensions)
     }
 
     #[inline]
@@ -230,4 +229,18 @@ impl Sys for RealSys {
             .map(|_| true)
             .map_err(|e| io::Error::from_raw_os_error(e.raw() as i32))
     }
+}
+
+fn parse_path_ext(pathext: &str) -> Vec<String> {
+    pathext
+    .split(';')
+    .filter_map(|s| {
+        if s.as_bytes().first() == Some(&b'.') {
+            Some(s.to_owned())
+        } else {
+            // Invalid segment; just ignore it.
+            None
+        }
+    })
+    .collect()
 }
