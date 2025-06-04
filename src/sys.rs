@@ -188,12 +188,16 @@ impl Sys for RealSys {
         static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
         let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
             self.env_path_ext()
-                .and_then(|pathext| match pathext.into_string() {
-                    Ok(pathext) => Some(pathext),
-                    Err(_) => {
-                        #[cfg(feature = "tracing")]
-                        tracing::error!("pathext is not valid unicode");
-                        None
+                .and_then(|pathext| {
+                    // If tracing feature enabled then this lint is incorrect, so disable it.
+                    #[allow(clippy::manual_ok_err)]
+                    match pathext.into_string() {
+                        Ok(pathext) => Some(pathext),
+                        Err(_) => {
+                            #[cfg(feature = "tracing")]
+                            tracing::error!("pathext is not valid unicode");
+                            None
+                        }
                     }
                 })
                 .map(|s| parse_path_ext(&s))
