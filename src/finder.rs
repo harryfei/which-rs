@@ -1,23 +1,14 @@
-use crate::checker::CompositeChecker;
+use crate::checker::is_valid;
 use crate::helper::has_executable_extension;
 use crate::sys::Sys;
 use crate::sys::SysReadDirEntry;
 use crate::{error::*, NonFatalErrorHandler};
-use either::Either;
 #[cfg(feature = "regex")]
 use regex::Regex;
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::iter;
 use std::path::{Component, Path, PathBuf};
-
-pub trait Checker {
-    fn is_valid<F: NonFatalErrorHandler>(
-        &self,
-        path: &Path,
-        nonfatal_error_handler: &mut F,
-    ) -> bool;
-}
+use std::vec;
 
 trait PathExt {
     fn has_separator(&self) -> bool;
@@ -53,20 +44,20 @@ pub struct Finder<TSys: Sys> {
     sys: TSys,
 }
 
-impl<TSys: Sys + 'static> Finder<TSys> {
+impl<TSys: Sys> Finder<TSys> {
     pub fn new(sys: TSys) -> Self {
         Finder { sys }
     }
 
     pub fn find<'a, T, U, V, F: NonFatalErrorHandler + 'a>(
-        &self,
+        self,
         binary_name: T,
         paths: Option<U>,
         cwd: Option<V>,
-        binary_checker: CompositeChecker<TSys>,
-        mut nonfatal_error_handler: F,
+        nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf> + 'a>
     where
+        TSys: 'a,
         T: AsRef<OsStr>,
         U: AsRef<OsStr>,
         V: AsRef<Path> + 'a,
@@ -81,18 +72,12 @@ impl<TSys: Sys + 'static> Finder<TSys> {
             cwd.as_ref().map(|p| p.as_ref().display())
         );
 
-        let binary_path_candidates = match cwd {
+        let ret = match cwd {
             Some(cwd) if path.has_separator() => {
-                #[cfg(feature = "tracing")]
-                tracing::trace!(
-                    "{} has a path seperator, so only CWD will be searched.",
-                    path.display()
-                );
-                // Search binary in cwd if the path have a path separator.
-                Either::Left(Self::cwd_search_candidates(&self.sys, path, cwd))
+                WhichFindIterator::new_cwd(path, cwd.as_ref(), self.sys, nonfatal_error_handler)
             }
             _ => {
-                #[cfg(feature = "tracing")]
+        #[cfg(feature = "tracing")]
                 tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
@@ -100,20 +85,9 @@ impl<TSys: Sys + 'static> Finder<TSys> {
                 if paths.is_empty() {
                     return Err(Error::CannotGetCurrentDirAndPathListEmpty);
                 }
-
-                Either::Right(Self::path_search_candidates(
-                    &self.sys,
-                    path,
-                    paths.into_iter(),
-                ))
+                WhichFindIterator::new_paths(path, paths, self.sys, nonfatal_error_handler)
             }
         };
-        let sys = self.sys.clone();
-        let ret = binary_path_candidates.filter_map(move |p| {
-            binary_checker
-                .is_valid(&p, &mut nonfatal_error_handler)
-                .then(|| correct_casing(&sys, p, &mut nonfatal_error_handler))
-        });
         #[cfg(feature = "tracing")]
         let ret = ret.inspect(|p| {
             tracing::debug!("found path {}", p.display());
@@ -123,10 +97,9 @@ impl<TSys: Sys + 'static> Finder<TSys> {
 
     #[cfg(feature = "regex")]
     pub fn find_re<T, F: NonFatalErrorHandler>(
-        &self,
+        self,
         binary_regex: impl std::borrow::Borrow<Regex>,
         paths: Option<T>,
-        binary_checker: CompositeChecker<TSys>,
         mut nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf>>
     where
@@ -135,10 +108,9 @@ impl<TSys: Sys + 'static> Finder<TSys> {
         let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
         let paths = self.sys.env_split_paths(p.as_ref());
 
-        let sys = self.sys.clone();
         let matching_re = paths
             .into_iter()
-            .flat_map(move |p| sys.read_dir(&p))
+            .flat_map(move |p| self.sys.read_dir(&p))
             .flatten()
             .flatten()
             .map(|e| e.path())
@@ -149,117 +121,119 @@ impl<TSys: Sys + 'static> Finder<TSys> {
                     false
                 }
             })
-            .filter(move |p| binary_checker.is_valid(p, &mut nonfatal_error_handler));
+            .filter(move |p| is_valid(self.sys, p, &mut nonfatal_error_handler));
 
         Ok(matching_re)
     }
+}
 
-    fn cwd_search_candidates<C>(
-        sys: &TSys,
-        binary_name: PathBuf,
-        cwd: C,
-    ) -> impl Iterator<Item = PathBuf>
-    where
-        C: AsRef<Path>,
-    {
-        let path = binary_name.to_absolute(cwd);
+struct WhichFindIterator<TSys: Sys, F: NonFatalErrorHandler> {
+    sys: TSys,
+    paths: PathsIter<vec::IntoIter<PathBuf>>,
+    nonfatal_error_handler: F,
+}
 
-        Self::append_extension(sys, iter::once(path))
-    }
-
-    fn path_search_candidates<P>(
-        sys: &TSys,
-        binary_name: PathBuf,
-        paths: P,
-    ) -> impl Iterator<Item = PathBuf>
-    where
-        P: Iterator<Item = PathBuf>,
-    {
-        let new_paths = paths.map({
-            let sys = sys.clone();
-            move |p| tilde_expansion(&sys, &p).join(binary_name.clone())
-        });
-
-        Self::append_extension(sys, new_paths)
-    }
-
-    fn append_extension<P>(sys: &TSys, paths: P) -> impl Iterator<Item = PathBuf>
-    where
-        P: Iterator<Item = PathBuf>,
-    {
-        struct PathsIter<P>
-        where
-            P: Iterator<Item = PathBuf>,
-        {
-            paths: P,
-            current_path_with_index: Option<(PathBuf, usize)>,
-            path_extensions: Cow<'static, [String]>,
-        }
-
-        impl<P> Iterator for PathsIter<P>
-        where
-            P: Iterator<Item = PathBuf>,
-        {
-            type Item = PathBuf;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                if self.path_extensions.is_empty() {
-                    self.paths.next()
-                } else if let Some((p, index)) = self.current_path_with_index.take() {
-                    let next_index = index + 1;
-                    if next_index < self.path_extensions.len() {
-                        self.current_path_with_index = Some((p.clone(), next_index));
-                    }
-                    // Append the extension.
-                    let mut p = p.into_os_string();
-                    p.push(&self.path_extensions[index]);
-                    let ret = PathBuf::from(p);
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!("possible extension: {}", ret.display());
-                    Some(ret)
-                } else {
-                    let p = self.paths.next()?;
-                    if has_executable_extension(&p, &self.path_extensions) {
-                        #[cfg(feature = "tracing")]
-                        tracing::trace!(
-                            "{} already has an executable extension, not modifying it further",
-                            p.display()
-                        );
-                    } else {
-                        #[cfg(feature = "tracing")]
-                        tracing::trace!(
-                            "{} has no extension, using PATHEXT environment variable to infer one",
-                            p.display()
-                        );
-                        // Appended paths with windows executable extensions.
-                        // e.g. path `c:/windows/bin[.ext]` will expand to:
-                        // [c:/windows/bin.ext]
-                        // c:/windows/bin[.ext].COM
-                        // c:/windows/bin[.ext].EXE
-                        // c:/windows/bin[.ext].CMD
-                        // ...
-                        self.current_path_with_index = Some((p.clone(), 0));
-                    }
-                    Some(p)
-                }
-            }
-        }
-
+impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
+    pub fn new_cwd(binary_name: PathBuf, cwd: &Path, sys: TSys, nonfatal_error_handler: F) -> Self {
         let path_extensions = if sys.is_windows() {
             sys.env_windows_path_ext()
         } else {
             Cow::Borrowed(Default::default())
         };
+        Self {
+            sys,
+            paths: PathsIter { paths: vec![binary_name.to_absolute(cwd)].into_iter(), current_path_with_index: None, path_extensions  },
+            nonfatal_error_handler,
+        }
+    }
 
-        PathsIter {
-            paths,
-            current_path_with_index: None,
-            path_extensions,
+    pub fn new_paths(binary_name: PathBuf, paths: Vec<PathBuf>, sys: TSys, nonfatal_error_handler: F) -> Self {
+        let path_extensions = if sys.is_windows() {
+            sys.env_windows_path_ext()
+        } else {
+            Cow::Borrowed(Default::default())
+        };
+        let paths = paths.iter().map(|p| tilde_expansion(&sys, p).join(&binary_name)).collect::<Vec<_>>(); 
+        Self {
+            sys,
+            paths: PathsIter { paths: paths.into_iter(), current_path_with_index: None, path_extensions  },
+            nonfatal_error_handler,
         }
     }
 }
 
-fn tilde_expansion<'a, TSys: Sys>(sys: &TSys, p: &'a Path) -> Cow<'a, Path> {
+impl<TSys: Sys, F: NonFatalErrorHandler> Iterator for WhichFindIterator<TSys, F> {
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for path in &mut self.paths {
+            if is_valid(&self.sys, &path, &mut self.nonfatal_error_handler) {
+                return Some(correct_casing(&self.sys, path, &mut self.nonfatal_error_handler))
+            }
+        }
+        None
+    }
+}
+
+struct PathsIter<P>
+    where
+        P: Iterator<Item = PathBuf>,
+    {
+        paths: P,
+        current_path_with_index: Option<(PathBuf, usize)>,
+        path_extensions: Cow<'static, [String]>,
+    }
+
+    impl<P> Iterator for PathsIter<P>
+    where
+        P: Iterator<Item = PathBuf>,
+    {
+        type Item = PathBuf;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.path_extensions.is_empty() {
+                self.paths.next()
+            } else if let Some((p, index)) = self.current_path_with_index.take() {
+                let next_index = index + 1;
+                if next_index < self.path_extensions.len() {
+                    self.current_path_with_index = Some((p.clone(), next_index));
+                }
+                // Append the extension.
+                let mut p = p.into_os_string();
+                p.push(&self.path_extensions[index]);
+                let ret = PathBuf::from(p);
+                #[cfg(feature = "tracing")]
+                tracing::trace!("possible extension: {}", ret.display());
+                Some(ret)
+            } else {
+                let p = self.paths.next()?;
+                if has_executable_extension(&p, &self.path_extensions) {
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!(
+                        "{} already has an executable extension, not modifying it further",
+                        p.display()
+                    );
+                } else {
+                    #[cfg(feature = "tracing")]
+                    tracing::trace!(
+                        "{} has no extension, using PATHEXT environment variable to infer one",
+                        p.display()
+                    );
+                    // Appended paths with windows executable extensions.
+                    // e.g. path `c:/windows/bin[.ext]` will expand to:
+                    // [c:/windows/bin.ext]
+                    // c:/windows/bin[.ext].COM
+                    // c:/windows/bin[.ext].EXE
+                    // c:/windows/bin[.ext].CMD
+                    // ...
+                    self.current_path_with_index = Some((p.clone(), 0));
+                }
+                Some(p)
+            }
+        }
+    }
+
+fn tilde_expansion<TSys: Sys>(sys: TSys, p: &Path) -> Cow<'_, Path> {
     let mut component_iter = p.components();
     if let Some(Component::Normal(o)) = component_iter.next() {
         if o == "~" {
@@ -282,7 +256,7 @@ fn tilde_expansion<'a, TSys: Sys>(sys: &TSys, p: &'a Path) -> Cow<'a, Path> {
 }
 
 fn correct_casing<TSys: Sys, F: NonFatalErrorHandler>(
-    sys: &TSys,
+    sys: TSys,
     mut p: PathBuf,
     nonfatal_error_handler: &mut F,
 ) -> PathBuf {

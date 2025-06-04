@@ -19,7 +19,6 @@ tracing = ["dep:tracing"]
 real-sys = ["dep:env_home", "dep:rustix", "dep:winsafe"]
 
 [dependencies]
-either = "1.9.0"
 regex = { version = "1.10.2", optional = true }
 tracing = { version = "0.1.40", default-features = false, optional = true }
 

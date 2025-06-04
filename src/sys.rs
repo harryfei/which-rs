@@ -47,7 +47,7 @@ pub trait SysMetadata {
 ///     .unwrap()
 ///     .collect::<Vec<_>>();
 /// ```
-pub trait Sys: Clone {
+pub trait Sys {
     type ReadDirEntry: SysReadDirEntry;
     type Metadata: SysMetadata;
 
@@ -74,25 +74,7 @@ pub trait Sys: Clone {
     /// and isn't conditionally compiled with `#[cfg(windows)]` so that it
     /// can work in Wasm.
     fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
-        Cow::Owned(
-            self.env_path_ext()
-                .and_then(|pathext| {
-                    // If tracing feature enabled then this lint is incorrect, so disable it.
-                    #[allow(clippy::manual_ok_err)]
-                    match pathext.into_string() {
-                        Ok(pathext) => Some(pathext),
-                        Err(_) => {
-                            #[cfg(feature = "tracing")]
-                            tracing::error!("pathext is not valid unicode");
-                            None
-                        }
-                    }
-                })
-                .map(|pathext| parse_path_ext(&pathext))
-                // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                // improbable and would probably break Windows badly. Still, don't crash:
-                .unwrap_or_default(),
-        )
+        Cow::Owned(parse_path_ext(self.env_path_ext()))
     }
     /// Gets the metadata of the provided path, following symlinks.
     fn metadata(&self, path: &Path) -> io::Result<Self::Metadata>;
@@ -128,7 +110,7 @@ impl SysMetadata for std::fs::Metadata {
 }
 
 #[cfg(feature = "real-sys")]
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Copy)]
 pub struct RealSys;
 
 #[cfg(feature = "real-sys")]
@@ -186,25 +168,7 @@ impl Sys for RealSys {
         // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
         // hence its retention.)
         static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
-        let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-            self.env_path_ext()
-                .and_then(|pathext| {
-                    // If tracing feature enabled then this lint is incorrect, so disable it.
-                    #[allow(clippy::manual_ok_err)]
-                    match pathext.into_string() {
-                        Ok(pathext) => Some(pathext),
-                        Err(_) => {
-                            #[cfg(feature = "tracing")]
-                            tracing::error!("pathext is not valid unicode");
-                            None
-                        }
-                    }
-                })
-                .map(|s| parse_path_ext(&s))
-                // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                // improbable and would probably break Windows badly. Still, don't crash:
-                .unwrap_or_default()
-        });
+        let path_extensions = PATH_EXTENSIONS.get_or_init(|| parse_path_ext(self.env_path_ext()));
         Cow::Borrowed(path_extensions)
     }
 
@@ -258,18 +222,88 @@ impl Sys for RealSys {
     }
 }
 
-fn parse_path_ext(pathext: &str) -> Vec<String> {
+impl<T> Sys for &T
+where
+    T: Sys,
+{
+    type ReadDirEntry = T::ReadDirEntry;
+
+    type Metadata = T::Metadata;
+
+    fn is_windows(&self) -> bool {
+        (*self).is_windows()
+    }
+
+    fn current_dir(&self) -> io::Result<PathBuf> {
+        (*self).current_dir()
+    }
+
+    fn home_dir(&self) -> Option<PathBuf> {
+        (*self).home_dir()
+    }
+
+    fn env_split_paths(&self, paths: &OsStr) -> Vec<PathBuf> {
+        (*self).env_split_paths(paths)
+    }
+
+    fn env_path(&self) -> Option<OsString> {
+        (*self).env_path()
+    }
+
+    fn env_path_ext(&self) -> Option<OsString> {
+        (*self).env_path_ext()
+    }
+
+    fn metadata(&self, path: &Path) -> io::Result<Self::Metadata> {
+        (*self).metadata(path)
+    }
+
+    fn symlink_metadata(&self, path: &Path) -> io::Result<Self::Metadata> {
+        (*self).symlink_metadata(path)
+    }
+
+    fn read_dir(
+        &self,
+        path: &Path,
+    ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>> {
+        (*self).read_dir(path)
+    }
+
+    fn is_valid_executable(&self, path: &Path) -> io::Result<bool> {
+        (*self).is_valid_executable(path)
+    }
+}
+
+fn parse_path_ext(pathext: Option<OsString>) -> Vec<String> {
     pathext
-        .split(';')
-        .filter_map(|s| {
-            if s.as_bytes().first() == Some(&b'.') {
-                Some(s.to_owned())
-            } else {
-                // Invalid segment; just ignore it.
-                #[cfg(feature = "tracing")]
-                tracing::debug!("PATHEXT segment \"{s}\" missing leading dot, ignoring");
-                None
+        .and_then(|pathext| {
+            // If tracing feature enabled then this lint is incorrect, so disable it.
+            #[allow(clippy::manual_ok_err)]
+            match pathext.into_string() {
+                Ok(pathext) => Some(pathext),
+                Err(_) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!("pathext is not valid unicode");
+                    None
+                }
             }
         })
-        .collect()
+        .map(|pathext| {
+            pathext
+                .split(';')
+                .filter_map(|s| {
+                    if s.as_bytes().first() == Some(&b'.') {
+                        Some(s.to_owned())
+                    } else {
+                        // Invalid segment; just ignore it.
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!("PATHEXT segment \"{s}\" missing leading dot, ignoring");
+                        None
+                    }
+                })
+                .collect()
+        })
+        // PATHEXT not being set or not being a proper Unicode string is exceedingly
+        // improbable and would probably break Windows badly. Still, don't crash:
+        .unwrap_or_default()
 }
