@@ -767,8 +767,12 @@ mod in_memory {
                 .collect()
         }
 
-        fn env_var_os(&self, name: &OsStr) -> Option<OsString> {
-            self.env_vars.get(name).cloned()
+        fn env_path(&self) -> Option<OsString> {
+            self.env_vars.get(OsStr::new("PATH")).cloned()
+        }
+
+        fn env_path_ext(&self) -> Option<OsString> {
+            self.env_vars.get(OsStr::new("PATHEXT")).cloned()
         }
 
         fn metadata(&self, path: &Path) -> io::Result<Self::Metadata> {

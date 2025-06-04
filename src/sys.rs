@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::env::VarError;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::io;
@@ -63,14 +62,10 @@ pub trait Sys: Clone {
     fn home_dir(&self) -> Option<PathBuf>;
     /// Splits a platform-specific PATH variable into a list of paths.
     fn env_split_paths(&self, paths: &OsStr) -> Vec<PathBuf>;
-    /// Gets the value of an environment variable.
-    fn env_var_os(&self, name: &OsStr) -> Option<OsString>;
-    fn env_var(&self, key: &OsStr) -> Result<String, VarError> {
-        match self.env_var_os(key) {
-            Some(val) => val.into_string().map_err(VarError::NotUnicode),
-            None => Err(VarError::NotPresent),
-        }
-    }
+    /// Gets the value of the PATH environment variable.
+    fn env_path(&self) -> Option<OsString>;
+    /// Gets the value of the PATHEXT environment variable. If not on Windows, simply return None.
+    fn env_path_ext(&self) -> Option<OsString>;
     /// Gets and parses the PATHEXT environment variable on Windows.
     ///
     /// Override this to enable caching the parsed PATHEXT.
@@ -80,7 +75,19 @@ pub trait Sys: Clone {
     /// can work in Wasm.
     fn env_windows_path_ext(&self) -> Cow<'static, [String]> {
         Cow::Owned(
-            self.env_var(OsStr::new("PATHEXT"))
+            self.env_path_ext()
+                .and_then(|pathext| {
+                    // If tracing feature enabled then this lint is incorrect, so disable it.
+                    #[allow(clippy::manual_ok_err)]
+                    match pathext.into_string() {
+                        Ok(pathext) => Some(pathext),
+                        Err(_) => {
+                            #[cfg(feature = "tracing")]
+                            tracing::error!("pathext is not valid unicode");
+                            None
+                        }
+                    }
+                })
                 .map(|pathext| parse_path_ext(&pathext))
                 // PATHEXT not being set or not being a proper Unicode string is exceedingly
                 // improbable and would probably break Windows badly. Still, don't crash:
@@ -180,7 +187,15 @@ impl Sys for RealSys {
         // hence its retention.)
         static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
         let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-            self.env_var(OsStr::new("PATHEXT"))
+            self.env_path_ext()
+                .and_then(|pathext| match pathext.into_string() {
+                    Ok(pathext) => Some(pathext),
+                    Err(_) => {
+                        #[cfg(feature = "tracing")]
+                        tracing::error!("pathext is not valid unicode");
+                        None
+                    }
+                })
                 .map(|s| parse_path_ext(&s))
                 // PATHEXT not being set or not being a proper Unicode string is exceedingly
                 // improbable and would probably break Windows badly. Still, don't crash:
@@ -190,9 +205,15 @@ impl Sys for RealSys {
     }
 
     #[inline]
-    fn env_var_os(&self, name: &OsStr) -> Option<OsString> {
+    fn env_path(&self) -> Option<OsString> {
         #[allow(clippy::disallowed_methods)] // ok, sys implementation
-        std::env::var_os(name)
+        std::env::var_os("PATH")
+    }
+
+    #[inline]
+    fn env_path_ext(&self) -> Option<OsString> {
+        #[allow(clippy::disallowed_methods)] // ok, sys implementation
+        std::env::var_os("PATHEXT")
     }
 
     #[inline]
@@ -241,6 +262,8 @@ fn parse_path_ext(pathext: &str) -> Vec<String> {
                 Some(s.to_owned())
             } else {
                 // Invalid segment; just ignore it.
+                #[cfg(feature = "tracing")]
+                tracing::debug!("PATHEXT segment \"{s}\" missing leading dot, ignoring");
                 None
             }
         })

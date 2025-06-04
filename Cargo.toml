@@ -16,7 +16,7 @@ keywords = ["which", "which-rs", "unix", "command"]
 default = ["real-sys"]
 regex = ["dep:regex"]
 tracing = ["dep:tracing"]
-real-sys = ["env_home", "rustix", "winsafe"]
+real-sys = ["dep:env_home", "dep:rustix", "dep:winsafe"]
 
 [dependencies]
 either = "1.9.0"
