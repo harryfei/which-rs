@@ -790,8 +790,7 @@ mod in_memory {
         fn read_dir(
             &self,
             path: &Path,
-        ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>>
-        {
+        ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>> {
             let entry = self
                 .get_entry_follow_symlink(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
