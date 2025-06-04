@@ -494,8 +494,10 @@ mod real_sys {
 mod in_memory {
     use std::collections::BTreeMap;
     use std::collections::HashMap;
+    use std::collections::HashSet;
     use std::ffi::OsStr;
     use std::ffi::OsString;
+    use std::io;
     use std::io::Error;
     use std::io::ErrorKind;
     use std::path::Component;
@@ -724,7 +726,7 @@ mod in_memory {
 
         fn get_entry_follow_symlink(&self, path: &Path) -> Option<&DirectoryEntry> {
             let mut current_path = path.to_path_buf();
-            let mut seen = std::collections::HashSet::new();
+            let mut seen = HashSet::new();
 
             loop {
                 let entry = self.get_entry(&current_path)?;
@@ -749,7 +751,7 @@ mod in_memory {
             self.is_windows
         }
 
-        fn current_dir(&self) -> std::io::Result<PathBuf> {
+        fn current_dir(&self) -> io::Result<PathBuf> {
             Ok(self.cwd.clone())
         }
 
@@ -769,7 +771,7 @@ mod in_memory {
             self.env_vars.get(name).cloned()
         }
 
-        fn metadata(&self, path: &Path) -> std::io::Result<Self::Metadata> {
+        fn metadata(&self, path: &Path) -> io::Result<Self::Metadata> {
             let entry = self
                 .get_entry_follow_symlink(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
@@ -777,7 +779,7 @@ mod in_memory {
             Ok(entry.as_metadata())
         }
 
-        fn symlink_metadata(&self, path: &Path) -> std::io::Result<Self::Metadata> {
+        fn symlink_metadata(&self, path: &Path) -> io::Result<Self::Metadata> {
             let entry = self
                 .get_entry(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
@@ -788,7 +790,7 @@ mod in_memory {
         fn read_dir(
             &self,
             path: &Path,
-        ) -> std::io::Result<Box<dyn Iterator<Item = std::io::Result<Self::ReadDirEntry>>>>
+        ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>>
         {
             let entry = self
                 .get_entry_follow_symlink(path)
@@ -812,7 +814,7 @@ mod in_memory {
             }
         }
 
-        fn is_valid_executable(&self, path: &Path) -> std::io::Result<bool> {
+        fn is_valid_executable(&self, path: &Path) -> io::Result<bool> {
             let entry = self.get_entry_follow_symlink(path).ok_or_else(|| {
                 Error::new(ErrorKind::NotFound, "is_valid_executable: entry not found")
             })?;
