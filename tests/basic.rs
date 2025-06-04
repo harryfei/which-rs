@@ -722,7 +722,7 @@ mod in_memory {
             unreachable!()
         }
 
-        fn get_entry_follow(&self, path: &Path) -> Option<&DirectoryEntry> {
+        fn get_entry_follow_symlink(&self, path: &Path) -> Option<&DirectoryEntry> {
             let mut current_path = path.to_path_buf();
             let mut seen = std::collections::HashSet::new();
 
@@ -771,7 +771,7 @@ mod in_memory {
 
         fn metadata(&self, path: &Path) -> std::io::Result<Self::Metadata> {
             let entry = self
-                .get_entry_follow(path)
+                .get_entry_follow_symlink(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
 
             Ok(entry.as_metadata())
@@ -791,7 +791,7 @@ mod in_memory {
         ) -> std::io::Result<Box<dyn Iterator<Item = std::io::Result<Self::ReadDirEntry>>>>
         {
             let entry = self
-                .get_entry_follow(path)
+                .get_entry_follow_symlink(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
 
             match &entry {
@@ -813,7 +813,7 @@ mod in_memory {
         }
 
         fn is_valid_executable(&self, path: &Path) -> std::io::Result<bool> {
-            let entry = self.get_entry_follow(path).ok_or_else(|| {
+            let entry = self.get_entry_follow_symlink(path).ok_or_else(|| {
                 Error::new(ErrorKind::NotFound, "is_valid_executable: entry not found")
             })?;
 
