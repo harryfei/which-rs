@@ -6,12 +6,14 @@
 //! To find which rustc executable binary is using:
 //!
 //! ```no_run
+//! # #[cfg(feature = "real-sys")]
+//! # {
 //! use which::which;
 //! use std::path::PathBuf;
 //!
 //! let result = which("rustc").unwrap();
 //! assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
-//!
+//! # }
 //! ```
 
 #![forbid(unsafe_code)]
@@ -19,12 +21,9 @@
 mod checker;
 mod error;
 mod finder;
-#[cfg(windows)]
 mod helper;
+pub mod sys;
 
-#[cfg(feature = "regex")]
-use std::borrow::Borrow;
-use std::env;
 use std::fmt;
 use std::path;
 
@@ -33,6 +32,7 @@ use std::ffi::{OsStr, OsString};
 use crate::checker::CompositeChecker;
 pub use crate::error::*;
 use crate::finder::Finder;
+use crate::sys::Sys;
 
 /// Find an executable binary's path by name.
 ///
@@ -55,6 +55,7 @@ use crate::finder::Finder;
 /// assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
 ///
 /// ```
+#[cfg(feature = "real-sys")]
 pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
     which_all(binary_name).and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
 }
@@ -79,32 +80,35 @@ pub fn which<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
 /// assert_eq!(result, PathBuf::from("/usr/bin/rustc"));
 ///
 /// ```
+#[cfg(feature = "real-sys")]
 pub fn which_global<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
     which_all_global(binary_name).and_then(|mut i| i.next().ok_or(Error::CannotFindBinaryPath))
 }
 
 /// Find all binaries with `binary_name` using `cwd` to resolve relative paths.
+#[cfg(feature = "real-sys")]
 pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
-    let cwd = env::current_dir().ok();
+    let cwd = sys::RealSys.current_dir().ok();
 
-    Finder::new().find(
+    Finder::new(sys::RealSys).find(
         binary_name,
-        env::var_os("PATH"),
+        sys::RealSys.env_var_os(OsStr::new("PATH")),
         cwd,
-        CompositeChecker::new(),
+        CompositeChecker::new(sys::RealSys),
         Noop,
     )
 }
 
 /// Find all binaries with `binary_name` ignoring `cwd`.
+#[cfg(feature = "real-sys")]
 pub fn which_all_global<T: AsRef<OsStr>>(
     binary_name: T,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    Finder::new().find(
+    Finder::new(sys::RealSys).find(
         binary_name,
-        env::var_os("PATH"),
+        sys::RealSys.env_var_os(OsStr::new("PATH")),
         Option::<&Path>::None,
-        CompositeChecker::new(),
+        CompositeChecker::new(sys::RealSys),
         Noop,
     )
 }
@@ -141,12 +145,15 @@ pub fn which_all_global<T: AsRef<OsStr>>(
 /// which_re(Regex::new("^cargo-.*").unwrap()).unwrap()
 ///     .for_each(|pth| println!("{}", pth.to_string_lossy()));
 /// ```
-#[cfg(feature = "regex")]
-pub fn which_re(regex: impl Borrow<Regex>) -> Result<impl Iterator<Item = path::PathBuf>> {
-    which_re_in(regex, env::var_os("PATH"))
+#[cfg(all(feature = "regex", feature = "real-sys"))]
+pub fn which_re(
+    regex: impl std::borrow::Borrow<Regex>,
+) -> Result<impl Iterator<Item = path::PathBuf>> {
+    which_re_in(regex, sys::RealSys.env_var_os(OsStr::new("PATH")))
 }
 
 /// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
+#[cfg(feature = "real-sys")]
 pub fn which_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<path::PathBuf>
 where
     T: AsRef<OsStr>,
@@ -180,18 +187,19 @@ where
 /// let python_paths = vec![PathBuf::from("/usr/bin/python2"), PathBuf::from("/usr/bin/python3")];
 /// assert_eq!(binaries, python_paths);
 /// ```
-#[cfg(feature = "regex")]
+#[cfg(all(feature = "regex", feature = "real-sys"))]
 pub fn which_re_in<T>(
-    regex: impl Borrow<Regex>,
+    regex: impl std::borrow::Borrow<Regex>,
     paths: Option<T>,
 ) -> Result<impl Iterator<Item = path::PathBuf>>
 where
     T: AsRef<OsStr>,
 {
-    Finder::new().find_re(regex, paths, CompositeChecker::new(), Noop)
+    Finder::new(sys::RealSys).find_re(regex, paths, CompositeChecker::new(sys::RealSys), Noop)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
+#[cfg(feature = "real-sys")]
 pub fn which_in_all<'a, T, U, V>(
     binary_name: T,
     paths: Option<U>,
@@ -202,10 +210,17 @@ where
     U: AsRef<OsStr>,
     V: AsRef<path::Path> + 'a,
 {
-    Finder::new().find(binary_name, paths, Some(cwd), CompositeChecker::new(), Noop)
+    Finder::new(sys::RealSys).find(
+        binary_name,
+        paths,
+        Some(cwd),
+        CompositeChecker::new(sys::RealSys),
+        Noop,
+    )
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, ignoring `cwd`.
+#[cfg(feature = "real-sys")]
 pub fn which_in_global<T, U>(
     binary_name: T,
     paths: Option<U>,
@@ -214,23 +229,24 @@ where
     T: AsRef<OsStr>,
     U: AsRef<OsStr>,
 {
-    Finder::new().find(
+    Finder::new(sys::RealSys).find(
         binary_name,
         paths,
         Option::<&Path>::None,
-        CompositeChecker::new(),
+        CompositeChecker::new(sys::RealSys),
         Noop,
     )
 }
 
 /// A wrapper containing all functionality in this crate.
-pub struct WhichConfig<F = Noop> {
+pub struct WhichConfig<TSys: sys::Sys + 'static, F = Noop> {
     cwd: Option<either::Either<bool, path::PathBuf>>,
     custom_path_list: Option<OsString>,
     binary_name: Option<OsString>,
     nonfatal_error_handler: F,
     #[cfg(feature = "regex")]
     regex: Option<Regex>,
+    sys: TSys,
 }
 
 /// A handler for non-fatal errors which does nothing with them.
@@ -261,7 +277,8 @@ where
     }
 }
 
-impl<F: Default> Default for WhichConfig<F> {
+#[cfg(feature = "real-sys")]
+impl<F: Default> Default for WhichConfig<sys::RealSys, F> {
     fn default() -> Self {
         Self {
             cwd: Some(either::Either::Left(true)),
@@ -270,6 +287,7 @@ impl<F: Default> Default for WhichConfig<F> {
             nonfatal_error_handler: F::default(),
             #[cfg(feature = "regex")]
             regex: None,
+            sys: sys::RealSys,
         }
     }
 }
@@ -280,13 +298,32 @@ type Regex = regex::Regex;
 #[cfg(not(feature = "regex"))]
 type Regex = ();
 
-impl WhichConfig<Noop> {
+#[cfg(feature = "real-sys")]
+impl WhichConfig<sys::RealSys, Noop> {
     pub fn new() -> Self {
-        Self::default()
+        Self::new_with_sys(sys::RealSys)
     }
 }
 
-impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
+impl<TSys: Sys> WhichConfig<TSys, Noop> {
+    /// Creates a new `WhichConfig` with the given `sys::Sys`.
+    ///
+    /// This is useful for providing all the system related
+    /// functionality to this crate.
+    pub fn new_with_sys(sys: TSys) -> Self {
+        Self {
+            cwd: Some(either::Either::Left(true)),
+            custom_path_list: None,
+            binary_name: None,
+            nonfatal_error_handler: Noop,
+            #[cfg(feature = "regex")]
+            regex: None,
+            sys,
+        }
+    }
+}
+
+impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     /// Whether or not to use the current working directory. `true` by default.
     ///
     /// # Panics
@@ -376,6 +413,8 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
     ///
     /// # Example
     /// ```
+    /// # #[cfg(feature = "real-sys")]
+    /// # {
     /// # use which::WhichConfig;
     /// let mut nonfatal_errors = Vec::new();
     ///
@@ -389,11 +428,14 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
     /// if !nonfatal_errors.is_empty() {
     ///     println!("nonfatal errors encountered: {nonfatal_errors:?}");
     /// }
+    /// # }
     /// ```
     ///
     /// You could also log it if you choose
     ///
     /// ```
+    /// # #[cfg(feature = "real-sys")]
+    /// # {
     /// # use which::WhichConfig;
     /// WhichConfig::new()
     ///     .binary_name("tar".into())
@@ -401,8 +443,9 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
     ///     .all_results()
     ///     .unwrap()
     ///     .collect::<Vec<_>>();
+    /// # }
     /// ```
-    pub fn nonfatal_error_handler<NewF>(self, handler: NewF) -> WhichConfig<NewF> {
+    pub fn nonfatal_error_handler<NewF>(self, handler: NewF) -> WhichConfig<TSys, NewF> {
         WhichConfig {
             custom_path_list: self.custom_path_list,
             cwd: self.cwd,
@@ -410,6 +453,7 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
             nonfatal_error_handler: handler,
             #[cfg(feature = "regex")]
             regex: self.regex,
+            sys: self.sys,
         }
     }
 
@@ -421,15 +465,17 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
 
     /// Finishes configuring, runs the query and returns all results.
     pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf> + 'a> {
-        let paths = self.custom_path_list.or_else(|| env::var_os("PATH"));
+        let paths = self
+            .custom_path_list
+            .or_else(|| self.sys.env_var_os(OsStr::new("PATH")));
 
         #[cfg(feature = "regex")]
         if let Some(regex) = self.regex {
-            return Finder::new()
+            return Finder::new(self.sys.clone())
                 .find_re(
                     regex,
                     paths,
-                    CompositeChecker::new(),
+                    CompositeChecker::new(self.sys),
                     self.nonfatal_error_handler,
                 )
                 .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>);
@@ -438,17 +484,17 @@ impl<'a, F: NonFatalErrorHandler + 'a> WhichConfig<F> {
         let cwd = match self.cwd {
             Some(either::Either::Left(false)) => None,
             Some(either::Either::Right(custom)) => Some(custom),
-            None | Some(either::Either::Left(true)) => env::current_dir().ok(),
+            None | Some(either::Either::Left(true)) => self.sys.current_dir().ok(),
         };
 
-        Finder::new()
+        Finder::new(self.sys.clone())
             .find(
                 self.binary_name.expect(
                     "binary_name not set! You must set binary_name or regex before searching!",
                 ),
                 paths,
                 cwd,
-                CompositeChecker::new(),
+                CompositeChecker::new(self.sys),
                 self.nonfatal_error_handler,
             )
             .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>)
@@ -474,6 +520,7 @@ impl Path {
     /// Returns the path of an executable binary by name.
     ///
     /// This calls `which` and maps the result into a `Path`.
+    #[cfg(feature = "real-sys")]
     pub fn new<T: AsRef<OsStr>>(binary_name: T) -> Result<Path> {
         which(binary_name).map(|inner| Path { inner })
     }
@@ -481,6 +528,7 @@ impl Path {
     /// Returns the paths of all executable binaries by a name.
     ///
     /// this calls `which_all` and maps the results into `Path`s.
+    #[cfg(feature = "real-sys")]
     pub fn all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = Path>> {
         which_all(binary_name).map(|inner| inner.map(|inner| Path { inner }))
     }
@@ -489,6 +537,7 @@ impl Path {
     /// current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in` and maps the result into a `Path`.
+    #[cfg(feature = "real-sys")]
     pub fn new_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<Path>
     where
         T: AsRef<OsStr>,
@@ -502,6 +551,7 @@ impl Path {
     /// current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and maps the results into a `Path`.
+    #[cfg(feature = "real-sys")]
     pub fn all_in<'a, T, U, V>(
         binary_name: T,
         paths: Option<U>,
@@ -586,22 +636,28 @@ impl CanonicalPath {
     /// Returns the canonical path of an executable binary by name.
     ///
     /// This calls `which` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
+    #[cfg(feature = "real-sys")]
     pub fn new<T: AsRef<OsStr>>(binary_name: T) -> Result<CanonicalPath> {
         which(binary_name)
-            .and_then(|p| p.canonicalize().map_err(|_| Error::CannotCanonicalize))
+            .and_then(|p| {
+                sys::RealSys
+                    .canonicalize(&p)
+                    .map_err(|_| Error::CannotCanonicalize)
+            })
             .map(|inner| CanonicalPath { inner })
     }
 
     /// Returns the canonical paths of an executable binary by name.
     ///
     /// This calls `which_all` and `Path::canonicalize` and maps the results into `CanonicalPath`s.
+    #[cfg(feature = "real-sys")]
     pub fn all<T: AsRef<OsStr>>(
         binary_name: T,
     ) -> Result<impl Iterator<Item = Result<CanonicalPath>>> {
         which_all(binary_name).map(|inner| {
             inner.map(|inner| {
-                inner
-                    .canonicalize()
+                sys::RealSys
+                    .canonicalize(&inner)
                     .map_err(|_| Error::CannotCanonicalize)
                     .map(|inner| CanonicalPath { inner })
             })
@@ -612,6 +668,7 @@ impl CanonicalPath {
     /// using the current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
+    #[cfg(feature = "real-sys")]
     pub fn new_in<T, U, V>(binary_name: T, paths: Option<U>, cwd: V) -> Result<CanonicalPath>
     where
         T: AsRef<OsStr>,
@@ -619,7 +676,11 @@ impl CanonicalPath {
         V: AsRef<path::Path>,
     {
         which_in(binary_name, paths, cwd)
-            .and_then(|p| p.canonicalize().map_err(|_| Error::CannotCanonicalize))
+            .and_then(|p| {
+                sys::RealSys
+                    .canonicalize(&p)
+                    .map_err(|_| Error::CannotCanonicalize)
+            })
             .map(|inner| CanonicalPath { inner })
     }
 
@@ -627,6 +688,7 @@ impl CanonicalPath {
     /// using the current working directory `cwd` to resolve relative paths.
     ///
     /// This calls `which_in_all` and `Path::canonicalize` and maps the result into a `CanonicalPath`.
+    #[cfg(feature = "real-sys")]
     pub fn all_in<'a, T, U, V>(
         binary_name: T,
         paths: Option<U>,
@@ -639,8 +701,8 @@ impl CanonicalPath {
     {
         which_in_all(binary_name, paths, cwd).map(|inner| {
             inner.map(|inner| {
-                inner
-                    .canonicalize()
+                sys::RealSys
+                    .canonicalize(&inner)
                     .map_err(|_| Error::CannotCanonicalize)
                     .map(|inner| CanonicalPath { inner })
             })

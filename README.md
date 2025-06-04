@@ -14,11 +14,9 @@ A Rust equivalent of Unix command "which". Locate installed executable in cross 
 
 ### A note on WebAssembly
 
-This project aims to support WebAssembly with the [wasi](https://wasi.dev/) extension. This extension is a requirement. `which` is a library for exploring a filesystem, and
-WebAssembly without wasi does not have a filesystem. `which` cannot do anything useful without this extension. Issues and PRs relating to
-`wasm32-unknown-unknown` and `wasm64-unknown-unknown` will not be resolved or merged. All `wasm32-wasi*` targets are officially supported.
+This project aims to support WebAssembly with the [WASI](https://wasi.dev/) extension. All `wasm32-wasi*` targets are officially supported.
 
-If you need to add a conditional dependency on `which` for this reason please refer to [the relevant cargo documentation for platform specific dependencies.](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies)
+If you need to add a conditional dependency on `which` please refer to [the relevant cargo documentation for platform specific dependencies.](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies)
 
 Here's an example of how to conditionally add `which`. You should tweak this to your needs.
 
@@ -26,6 +24,8 @@ Here's an example of how to conditionally add `which`. You should tweak this to 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dependencies]
 which = "7.0.0"
 ```
+
+Note that non-WASI environments have no access to the system. Using this in that situation requires disabling the default features of this crate and providing a custom `which::sys::Sys` implementation to `which::WhichConfig`.
 
 ## Examples
 
