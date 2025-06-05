@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 8.0.0
+
+- Add new `Sys` trait to allow abstracting over the underlying filesystem. Particularly useful for `wasm32-unknown-unknown` targets. Thanks [@dsherret](https://github.com/dsherret) for this contribution to which!
+- Add more debug level tracing for otherwise silent I/O errors.
+- Call the `NonFatalHandler` in more places to catch previously ignored I/O errors.  
+- Remove use of the `either` dependency.
+
 ## 7.0.3
 
 - Update rustix to version 1.0. Congrats to rustix on this milestone, and thanks [@mhils](https://github.com/mhils) for this contribution to which!
