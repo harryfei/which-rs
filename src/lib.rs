@@ -16,8 +16,6 @@
 //! # }
 //! ```
 
-#![forbid(unsafe_code)]
-
 mod checker;
 mod error;
 mod finder;
@@ -29,7 +27,6 @@ use std::path;
 
 use std::ffi::{OsStr, OsString};
 
-use crate::checker::CompositeChecker;
 pub use crate::error::*;
 use crate::finder::Finder;
 use crate::sys::Sys;
@@ -90,13 +87,7 @@ pub fn which_global<T: AsRef<OsStr>>(binary_name: T) -> Result<path::PathBuf> {
 pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item = path::PathBuf>> {
     let cwd = sys::RealSys.current_dir().ok();
 
-    Finder::new(sys::RealSys).find(
-        binary_name,
-        sys::RealSys.env_var_os(OsStr::new("PATH")),
-        cwd,
-        CompositeChecker::new(sys::RealSys),
-        Noop,
-    )
+    Finder::new(&sys::RealSys).find(binary_name, sys::RealSys.env_path(), cwd, Noop)
 }
 
 /// Find all binaries with `binary_name` ignoring `cwd`.
@@ -104,11 +95,10 @@ pub fn which_all<T: AsRef<OsStr>>(binary_name: T) -> Result<impl Iterator<Item =
 pub fn which_all_global<T: AsRef<OsStr>>(
     binary_name: T,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    Finder::new(sys::RealSys).find(
+    Finder::new(&sys::RealSys).find(
         binary_name,
-        sys::RealSys.env_var_os(OsStr::new("PATH")),
+        sys::RealSys.env_path(),
         Option::<&Path>::None,
-        CompositeChecker::new(sys::RealSys),
         Noop,
     )
 }
@@ -149,7 +139,7 @@ pub fn which_all_global<T: AsRef<OsStr>>(
 pub fn which_re(
     regex: impl std::borrow::Borrow<Regex>,
 ) -> Result<impl Iterator<Item = path::PathBuf>> {
-    which_re_in(regex, sys::RealSys.env_var_os(OsStr::new("PATH")))
+    which_re_in(regex, sys::RealSys.env_path())
 }
 
 /// Find `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
@@ -195,7 +185,7 @@ pub fn which_re_in<T>(
 where
     T: AsRef<OsStr>,
 {
-    Finder::new(sys::RealSys).find_re(regex, paths, CompositeChecker::new(sys::RealSys), Noop)
+    Finder::new(&sys::RealSys).find_re(regex, paths, Noop)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, using `cwd` to resolve relative paths.
@@ -210,13 +200,7 @@ where
     U: AsRef<OsStr>,
     V: AsRef<path::Path> + 'a,
 {
-    Finder::new(sys::RealSys).find(
-        binary_name,
-        paths,
-        Some(cwd),
-        CompositeChecker::new(sys::RealSys),
-        Noop,
-    )
+    Finder::new(&sys::RealSys).find(binary_name, paths, Some(cwd), Noop)
 }
 
 /// Find all binaries with `binary_name` in the path list `paths`, ignoring `cwd`.
@@ -229,24 +213,25 @@ where
     T: AsRef<OsStr>,
     U: AsRef<OsStr>,
 {
-    Finder::new(sys::RealSys).find(
-        binary_name,
-        paths,
-        Option::<&Path>::None,
-        CompositeChecker::new(sys::RealSys),
-        Noop,
-    )
+    Finder::new(&sys::RealSys).find(binary_name, paths, Option::<&Path>::None, Noop)
 }
 
 /// A wrapper containing all functionality in this crate.
-pub struct WhichConfig<TSys: sys::Sys + 'static, F = Noop> {
-    cwd: Option<either::Either<bool, path::PathBuf>>,
+pub struct WhichConfig<TSys: sys::Sys, F = Noop> {
+    cwd: CwdOption,
     custom_path_list: Option<OsString>,
     binary_name: Option<OsString>,
     nonfatal_error_handler: F,
     #[cfg(feature = "regex")]
     regex: Option<Regex>,
     sys: TSys,
+}
+
+enum CwdOption {
+    Unspecified,
+    UseSysCwd,
+    RefuseCwd,
+    UseCustomCwd(path::PathBuf),
 }
 
 /// A handler for non-fatal errors which does nothing with them.
@@ -278,16 +263,16 @@ where
 }
 
 #[cfg(feature = "real-sys")]
-impl<F: Default> Default for WhichConfig<sys::RealSys, F> {
+impl<F: Default> Default for WhichConfig<&sys::RealSys, F> {
     fn default() -> Self {
         Self {
-            cwd: Some(either::Either::Left(true)),
+            cwd: CwdOption::Unspecified,
             custom_path_list: None,
             binary_name: None,
             nonfatal_error_handler: F::default(),
             #[cfg(feature = "regex")]
             regex: None,
-            sys: sys::RealSys,
+            sys: &sys::RealSys,
         }
     }
 }
@@ -299,9 +284,9 @@ type Regex = regex::Regex;
 type Regex = ();
 
 #[cfg(feature = "real-sys")]
-impl WhichConfig<sys::RealSys, Noop> {
+impl WhichConfig<&sys::RealSys, Noop> {
     pub fn new() -> Self {
-        Self::new_with_sys(sys::RealSys)
+        Self::new_with_sys(&sys::RealSys)
     }
 }
 
@@ -312,7 +297,7 @@ impl<TSys: Sys> WhichConfig<TSys, Noop> {
     /// functionality to this crate.
     pub fn new_with_sys(sys: TSys) -> Self {
         Self {
-            cwd: Some(either::Either::Left(true)),
+            cwd: CwdOption::Unspecified,
             custom_path_list: None,
             binary_name: None,
             nonfatal_error_handler: Noop,
@@ -323,7 +308,7 @@ impl<TSys: Sys> WhichConfig<TSys, Noop> {
     }
 }
 
-impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
+impl<'a, TSys: Sys + 'a, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
     /// Whether or not to use the current working directory. `true` by default.
     ///
     /// # Panics
@@ -334,7 +319,12 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
         if self.regex.is_some() && use_cwd {
             panic!("which can't use regex and cwd at the same time!")
         }
-        self.cwd = Some(either::Either::Left(use_cwd));
+        // Otherwise, keep custom cwd if specified.
+        self.cwd = if use_cwd {
+            CwdOption::UseSysCwd
+        } else {
+            CwdOption::RefuseCwd
+        };
         self
     }
 
@@ -348,7 +338,7 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
         if self.regex.is_some() {
             panic!("which can't use regex and cwd at the same time!")
         }
-        self.cwd = Some(either::Either::Right(cwd));
+        self.cwd = CwdOption::UseCustomCwd(cwd);
         self
     }
 
@@ -371,7 +361,9 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
         }
         #[cfg(feature = "regex")]
         {
-            if self.cwd != Some(either::Either::Left(false)) && self.cwd.is_some() {
+            if matches!(self.cwd, CwdOption::UseSysCwd)
+                || matches!(self.cwd, CwdOption::UseCustomCwd(_))
+            {
                 panic!("which can't use regex and cwd at the same time!")
             }
             if self.binary_name.is_some() {
@@ -465,36 +457,28 @@ impl<'a, TSys: Sys, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
 
     /// Finishes configuring, runs the query and returns all results.
     pub fn all_results(self) -> Result<impl Iterator<Item = path::PathBuf> + 'a> {
-        let paths = self
-            .custom_path_list
-            .or_else(|| self.sys.env_var_os(OsStr::new("PATH")));
+        let paths = self.custom_path_list.or_else(|| self.sys.env_path());
 
         #[cfg(feature = "regex")]
         if let Some(regex) = self.regex {
-            return Finder::new(self.sys.clone())
-                .find_re(
-                    regex,
-                    paths,
-                    CompositeChecker::new(self.sys),
-                    self.nonfatal_error_handler,
-                )
+            return Finder::new(self.sys)
+                .find_re(regex, paths, self.nonfatal_error_handler)
                 .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>);
         }
 
         let cwd = match self.cwd {
-            Some(either::Either::Left(false)) => None,
-            Some(either::Either::Right(custom)) => Some(custom),
-            None | Some(either::Either::Left(true)) => self.sys.current_dir().ok(),
+            CwdOption::RefuseCwd => None,
+            CwdOption::UseCustomCwd(custom) => Some(custom),
+            CwdOption::UseSysCwd | CwdOption::Unspecified => self.sys.current_dir().ok(),
         };
 
-        Finder::new(self.sys.clone())
+        Finder::new(self.sys)
             .find(
                 self.binary_name.expect(
                     "binary_name not set! You must set binary_name or regex before searching!",
                 ),
                 paths,
                 cwd,
-                CompositeChecker::new(self.sys),
                 self.nonfatal_error_handler,
             )
             .map(|i| Box::new(i) as Box<dyn Iterator<Item = path::PathBuf> + 'a>)
