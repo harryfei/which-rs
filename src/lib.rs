@@ -16,8 +16,6 @@
 //! # }
 //! ```
 
-#![forbid(unsafe_code)]
-
 mod checker;
 mod error;
 mod finder;
@@ -363,7 +361,9 @@ impl<'a, TSys: Sys + 'a, F: NonFatalErrorHandler + 'a> WhichConfig<TSys, F> {
         }
         #[cfg(feature = "regex")]
         {
-            if matches!(self.cwd, CwdOption::UseSysCwd) || matches!(self.cwd, CwdOption::UseCustomCwd(_)) {
+            if matches!(self.cwd, CwdOption::UseSysCwd)
+                || matches!(self.cwd, CwdOption::UseCustomCwd(_))
+            {
                 panic!("which can't use regex and cwd at the same time!")
             }
             if self.binary_name.is_some() {

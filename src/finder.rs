@@ -5,8 +5,12 @@ use crate::sys::SysReadDirEntry;
 use crate::{error::*, NonFatalErrorHandler};
 #[cfg(feature = "regex")]
 use regex::Regex;
+#[cfg(feature = "regex")]
+use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::ffi::OsStr;
+#[cfg(feature = "regex")]
+use std::io;
 use std::path::{Component, Path, PathBuf};
 use std::vec;
 
@@ -77,7 +81,7 @@ impl<TSys: Sys> Finder<TSys> {
                 WhichFindIterator::new_cwd(path, cwd.as_ref(), self.sys, nonfatal_error_handler)
             }
             _ => {
-        #[cfg(feature = "tracing")]
+                #[cfg(feature = "tracing")]
                 tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
@@ -100,30 +104,12 @@ impl<TSys: Sys> Finder<TSys> {
         self,
         binary_regex: impl std::borrow::Borrow<Regex>,
         paths: Option<T>,
-        mut nonfatal_error_handler: F,
+        nonfatal_error_handler: F,
     ) -> Result<impl Iterator<Item = PathBuf>>
     where
         T: AsRef<OsStr>,
     {
-        let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
-        let paths = self.sys.env_split_paths(p.as_ref());
-
-        let matching_re = paths
-            .into_iter()
-            .flat_map(move |p| self.sys.read_dir(&p))
-            .flatten()
-            .flatten()
-            .map(|e| e.path())
-            .filter(move |p| {
-                if let Some(unicode_file_name) = p.file_name().unwrap().to_str() {
-                    binary_regex.borrow().is_match(unicode_file_name)
-                } else {
-                    false
-                }
-            })
-            .filter(move |p| is_valid(self.sys, p, &mut nonfatal_error_handler));
-
-        Ok(matching_re)
+        WhichFindRegexIter::new(self.sys, paths, binary_regex, nonfatal_error_handler)
     }
 }
 
@@ -142,21 +128,37 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
         };
         Self {
             sys,
-            paths: PathsIter { paths: vec![binary_name.to_absolute(cwd)].into_iter(), current_path_with_index: None, path_extensions  },
+            paths: PathsIter {
+                paths: vec![binary_name.to_absolute(cwd)].into_iter(),
+                current_path_with_index: None,
+                path_extensions,
+            },
             nonfatal_error_handler,
         }
     }
 
-    pub fn new_paths(binary_name: PathBuf, paths: Vec<PathBuf>, sys: TSys, nonfatal_error_handler: F) -> Self {
+    pub fn new_paths(
+        binary_name: PathBuf,
+        paths: Vec<PathBuf>,
+        sys: TSys,
+        nonfatal_error_handler: F,
+    ) -> Self {
         let path_extensions = if sys.is_windows() {
             sys.env_windows_path_ext()
         } else {
             Cow::Borrowed(Default::default())
         };
-        let paths = paths.iter().map(|p| tilde_expansion(&sys, p).join(&binary_name)).collect::<Vec<_>>(); 
+        let paths = paths
+            .iter()
+            .map(|p| tilde_expansion(&sys, p).join(&binary_name))
+            .collect::<Vec<_>>();
         Self {
             sys,
-            paths: PathsIter { paths: paths.into_iter(), current_path_with_index: None, path_extensions  },
+            paths: PathsIter {
+                paths: paths.into_iter(),
+                current_path_with_index: None,
+                path_extensions,
+            },
             nonfatal_error_handler,
         }
     }
@@ -168,7 +170,11 @@ impl<TSys: Sys, F: NonFatalErrorHandler> Iterator for WhichFindIterator<TSys, F>
     fn next(&mut self) -> Option<Self::Item> {
         for path in &mut self.paths {
             if is_valid(&self.sys, &path, &mut self.nonfatal_error_handler) {
-                return Some(correct_casing(&self.sys, path, &mut self.nonfatal_error_handler))
+                return Some(correct_casing(
+                    &self.sys,
+                    path,
+                    &mut self.nonfatal_error_handler,
+                ));
             }
         }
         None
@@ -176,62 +182,62 @@ impl<TSys: Sys, F: NonFatalErrorHandler> Iterator for WhichFindIterator<TSys, F>
 }
 
 struct PathsIter<P>
-    where
-        P: Iterator<Item = PathBuf>,
-    {
-        paths: P,
-        current_path_with_index: Option<(PathBuf, usize)>,
-        path_extensions: Cow<'static, [String]>,
-    }
+where
+    P: Iterator<Item = PathBuf>,
+{
+    paths: P,
+    current_path_with_index: Option<(PathBuf, usize)>,
+    path_extensions: Cow<'static, [String]>,
+}
 
-    impl<P> Iterator for PathsIter<P>
-    where
-        P: Iterator<Item = PathBuf>,
-    {
-        type Item = PathBuf;
+impl<P> Iterator for PathsIter<P>
+where
+    P: Iterator<Item = PathBuf>,
+{
+    type Item = PathBuf;
 
-        fn next(&mut self) -> Option<Self::Item> {
-            if self.path_extensions.is_empty() {
-                self.paths.next()
-            } else if let Some((p, index)) = self.current_path_with_index.take() {
-                let next_index = index + 1;
-                if next_index < self.path_extensions.len() {
-                    self.current_path_with_index = Some((p.clone(), next_index));
-                }
-                // Append the extension.
-                let mut p = p.into_os_string();
-                p.push(&self.path_extensions[index]);
-                let ret = PathBuf::from(p);
-                #[cfg(feature = "tracing")]
-                tracing::trace!("possible extension: {}", ret.display());
-                Some(ret)
-            } else {
-                let p = self.paths.next()?;
-                if has_executable_extension(&p, &self.path_extensions) {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} already has an executable extension, not modifying it further",
-                        p.display()
-                    );
-                } else {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} has no extension, using PATHEXT environment variable to infer one",
-                        p.display()
-                    );
-                    // Appended paths with windows executable extensions.
-                    // e.g. path `c:/windows/bin[.ext]` will expand to:
-                    // [c:/windows/bin.ext]
-                    // c:/windows/bin[.ext].COM
-                    // c:/windows/bin[.ext].EXE
-                    // c:/windows/bin[.ext].CMD
-                    // ...
-                    self.current_path_with_index = Some((p.clone(), 0));
-                }
-                Some(p)
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.path_extensions.is_empty() {
+            self.paths.next()
+        } else if let Some((p, index)) = self.current_path_with_index.take() {
+            let next_index = index + 1;
+            if next_index < self.path_extensions.len() {
+                self.current_path_with_index = Some((p.clone(), next_index));
             }
+            // Append the extension.
+            let mut p = p.into_os_string();
+            p.push(&self.path_extensions[index]);
+            let ret = PathBuf::from(p);
+            #[cfg(feature = "tracing")]
+            tracing::trace!("possible extension: {}", ret.display());
+            Some(ret)
+        } else {
+            let p = self.paths.next()?;
+            if has_executable_extension(&p, &self.path_extensions) {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "{} already has an executable extension, not modifying it further",
+                    p.display()
+                );
+            } else {
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "{} has no extension, using PATHEXT environment variable to infer one",
+                    p.display()
+                );
+                // Appended paths with windows executable extensions.
+                // e.g. path `c:/windows/bin[.ext]` will expand to:
+                // [c:/windows/bin.ext]
+                // c:/windows/bin[.ext].COM
+                // c:/windows/bin[.ext].EXE
+                // c:/windows/bin[.ext].CMD
+                // ...
+                self.current_path_with_index = Some((p.clone(), 0));
+            }
+            Some(p)
         }
     }
+}
 
 fn tilde_expansion<TSys: Sys>(sys: TSys, p: &Path) -> Cow<'_, Path> {
     let mut component_iter = p.components();
@@ -281,4 +287,82 @@ fn correct_casing<TSys: Sys, F: NonFatalErrorHandler>(
         }
     }
     p
+}
+
+#[cfg(feature = "regex")]
+struct WhichFindRegexIter<TSys: Sys, B: Borrow<Regex>, F: NonFatalErrorHandler> {
+    sys: TSys,
+    re: B,
+    paths: vec::IntoIter<PathBuf>,
+    nonfatal_error_handler: F,
+    current_read_dir_iter: Option<Box<dyn Iterator<Item = io::Result<TSys::ReadDirEntry>>>>,
+}
+
+#[cfg(feature = "regex")]
+impl<TSys: Sys, B: Borrow<Regex>, F: NonFatalErrorHandler> WhichFindRegexIter<TSys, B, F> {
+    pub fn new<T: AsRef<OsStr>>(
+        sys: TSys,
+        paths: Option<T>,
+        re: B,
+        nonfatal_error_handler: F,
+    ) -> Result<Self> {
+        let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
+        let paths = sys.env_split_paths(p.as_ref());
+        Ok(WhichFindRegexIter {
+            sys,
+            re,
+            paths: paths.into_iter(),
+            nonfatal_error_handler,
+            current_read_dir_iter: None,
+        })
+    }
+}
+
+#[cfg(feature = "regex")]
+impl<TSys: Sys, B: Borrow<Regex>, F: NonFatalErrorHandler> Iterator
+    for WhichFindRegexIter<TSys, B, F>
+{
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(iter) = &mut self.current_read_dir_iter {
+                match iter.next() {
+                    Some(Ok(path)) => {
+                        if let Some(unicode_file_name) = path.file_name().to_str() {
+                            if self.re.borrow().is_match(unicode_file_name) {
+                                return Some(path.path());
+                            } else {
+                                #[cfg(feature = "tracing")]
+                                tracing::debug!("regex filtered out {}", unicode_file_name);
+                            }
+                        } else {
+                            #[cfg(feature = "tracing")]
+                            tracing::debug!("regex unable to evaluate filename as it's not valid unicode. Lossy filename conversion: {}", path.file_name().to_string_lossy());
+                        }
+                    }
+                    Some(Err(e)) => {
+                        self.nonfatal_error_handler.handle(NonFatalError::Io(e));
+                    }
+                    None => {
+                        self.current_read_dir_iter = None;
+                    }
+                }
+            } else {
+                let path = self.paths.next();
+                if let Some(path) = path {
+                    match self.sys.read_dir(&path) {
+                        Ok(new_read_dir_iter) => {
+                            self.current_read_dir_iter = Some(new_read_dir_iter);
+                        }
+                        Err(e) => {
+                            self.nonfatal_error_handler.handle(NonFatalError::Io(e));
+                        }
+                    }
+                } else {
+                    return None;
+                }
+            }
+        }
+    }
 }
