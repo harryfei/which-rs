@@ -475,6 +475,28 @@ mod real_sys {
 
     #[test]
     #[cfg(windows)]
+    fn test_path_empty_entry() {
+        let f = TestFixture::new();
+        std::env::set_current_dir(f.tempdir.path().join("a")).unwrap();
+        let found = which::which_in_global(&BIN_NAME, Some("C:\\foo\\bar/;;C:\\bar\\foo"))
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert!(found.is_empty(), "results contained {found:?}")
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_path_empty_entry() {
+        let f = TestFixture::new();
+        std::env::set_current_dir(f.tempdir.path().join("a")).unwrap();
+        let found = which::which_in_global(&BIN_NAME, Some("/foo/bar/::/bar/foo"))
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert!(found.len() == 1, "results contained {found:?}")
+    }
+
+    #[test]
+    #[cfg(windows)]
     fn windows_no_extension_but_executable() {
         let this_executable = std::env::current_exe().unwrap();
         let new_name = this_executable.parent().unwrap().join("test_executable");
