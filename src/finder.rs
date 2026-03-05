@@ -148,10 +148,18 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
         } else {
             Cow::Borrowed(Default::default())
         };
+
+        let paths = paths.iter();
+
+        // PowerShell Get-Command omits empty entries in PATH string, unix `which` command does not.
+        // Emulate OS specific behavior here.
+        #[cfg(target_os = "windows")]
+        let paths = paths.filter(|p| !p.as_os_str().is_empty());
+
         let paths = paths
-            .iter()
             .map(|p| tilde_expansion(&sys, p).join(&binary_name))
             .collect::<Vec<_>>();
+
         Self {
             sys,
             paths: PathsIter {
