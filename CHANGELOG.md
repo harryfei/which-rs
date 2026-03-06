@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 8.0.1
+
+- Fix Windows bug reported in https://github.com/harryfei/which-rs/issues/108#issuecomment-3998654328
+
 ## 8.0.0
 
 - Add new `Sys` trait to allow abstracting over the underlying filesystem. Particularly useful for `wasm32-unknown-unknown` targets. Thanks [@dsherret](https://github.com/dsherret) for this contribution to which!
