@@ -143,15 +143,9 @@ impl Sys for RealSys {
 
     #[inline]
     fn home_dir(&self) -> Option<PathBuf> {
-        // Home dir shim, use env_home crate when possible. Otherwise, return None
-        #[cfg(any(windows, unix, target_os = "redox"))]
-        {
-            env_home::env_home_dir()
-        }
-        #[cfg(not(any(windows, unix, target_os = "redox")))]
-        {
-            None
-        }
+        #[allow(clippy::disallowed_methods)] // ok, sys implementation
+        #[allow(deprecated)] // only deprecated <1.85
+        std::env::home_dir()
     }
 
     #[inline]
