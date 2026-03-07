@@ -1,8 +1,8 @@
 [package]
 name = "which"
-version = "8.0.1"
+version = "9.0.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 authors = ["Harry Fei <tiziyuanfang@gmail.com>, Jacob Kiesel <jake@bitcrafters.co>"]
 repository = "https://github.com/harryfei/which-rs.git"
 documentation = "https://docs.rs/which/"

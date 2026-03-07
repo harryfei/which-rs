@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 9.0.0
+
+- MSRV bumped to Rust 1.85.0
+- Dependency on `home_env` removed, the implementation found in rust 1.85.0 for a home directory has been fixed.
+  Thanks, [@madsmtm],(https://github.com/madsmtm) for this contribution to which!
+
 ## 8.0.1
 
 - Fix Windows bug reported in https://github.com/harryfei/which-rs/issues/108#issuecomment-3998654328
