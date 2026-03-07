@@ -175,12 +175,18 @@ mod real_sys {
     fn test_which_tilde() {
         let old_home = env::var_os("HOME");
         let f = TestFixture::new_with_tilde_path();
-        env::set_var("HOME", f.tempdir.path().as_os_str());
+        unsafe {
+            env::set_var("HOME", f.tempdir.path().as_os_str());
+        }
         assert_eq!(_which(&f, BIN_NAME).unwrap(), f.bins[0]);
         if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
+            unsafe {
+                env::set_var("HOME", old_home);
+            }
         } else {
-            env::remove_var("HOME");
+            unsafe {
+                env::remove_var("HOME");
+            }
         }
     }
 

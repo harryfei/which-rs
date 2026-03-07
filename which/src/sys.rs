@@ -210,9 +210,23 @@ impl Sys for RealSys {
 
     #[cfg(windows)]
     fn is_valid_executable(&self, path: &Path) -> io::Result<bool> {
-        winsafe::GetBinaryType(&path.display().to_string())
-            .map(|_| true)
-            .map_err(|e| io::Error::from_raw_os_error(e.raw() as i32))
+        use std::os::windows::ffi::OsStrExt;
+
+        use crate::win_ffi;
+        let w_str: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let mut binary_type = 0u32;
+        unsafe {
+            let success = win_ffi::GetBinaryTypeW(w_str.as_ptr(), &mut binary_type);
+            if success != 0 {
+                Ok(true)
+            } else {
+                Err(io::Error::from_raw_os_error(win_ffi::GetLastError() as i32))
+            }
+        }
     }
 }
 

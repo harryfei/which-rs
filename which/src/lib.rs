@@ -21,6 +21,8 @@ mod error;
 mod finder;
 mod helper;
 pub mod sys;
+#[cfg(all(windows, feature = "real-sys"))]
+mod win_ffi;
 
 use std::fmt;
 use std::path;

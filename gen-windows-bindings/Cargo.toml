@@ -1,0 +1,8 @@
+[package]
+name = "gen-windows-bindings"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+windows-bindgen = "0.62"
