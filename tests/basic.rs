@@ -835,7 +835,7 @@ mod in_memory {
                     Ok(Box::new(entries.into_iter()))
                 }
                 // should use ErrorKind::NotADirectory once upgrading rust version
-                _ => Err(Error::new(ErrorKind::Other, "Not a directory")),
+                _ => Err(Error::other("Not a directory")),
             }
         }
 
