@@ -8,7 +8,7 @@ repository = "https://github.com/harryfei/which-rs.git"
 documentation = "https://docs.rs/which/"
 license = "MIT"
 description = "A Rust equivalent of Unix command \"which\". Locate installed executable in cross platforms."
-readme = "../README.md"
+readme = "README.md"
 categories = ["os", "filesystem"]
 keywords = ["which", "which-rs", "unix", "command"]
 
