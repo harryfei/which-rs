@@ -82,7 +82,10 @@ impl<TSys: Sys> Finder<TSys> {
             }
             _ => {
                 #[cfg(feature = "tracing")]
-                tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
+                tracing::trace!(
+                    "{} has no path seperators, so only paths in PATH environment variable will be searched.",
+                    path.display()
+                );
                 // Search binary in PATHs(defined in environment variable).
                 let paths = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
                 let paths = self.sys.env_split_paths(paths.as_ref());
@@ -346,7 +349,10 @@ impl<TSys: Sys, B: Borrow<Regex>, F: NonFatalErrorHandler> Iterator
                             }
                         } else {
                             #[cfg(feature = "tracing")]
-                            tracing::debug!("regex unable to evaluate filename as it's not valid unicode. Lossy filename conversion: {}", path.file_name().to_string_lossy());
+                            tracing::debug!(
+                                "regex unable to evaluate filename as it's not valid unicode. Lossy filename conversion: {}",
+                                path.file_name().to_string_lossy()
+                            );
                         }
                     }
                     Some(Err(e)) => {

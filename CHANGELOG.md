@@ -1,10 +1,10 @@
 # CHANGELOG
 
-## 9.0.0
+## 8.0.2
 
-- MSRV bumped to Rust 1.85.0
 - Dependency on `home_env` removed, the implementation found in rust 1.85.0 for a home directory has been fixed.
   Thanks, [@madsmtm],(https://github.com/madsmtm) for this contribution to which!
+- Dependency on `winsafe` removed, code for Windows API is now handwritten.
 
 ## 8.0.1
 
