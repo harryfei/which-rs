@@ -2,7 +2,7 @@ use crate::checker::is_valid;
 use crate::helper::has_executable_extension;
 use crate::sys::Sys;
 use crate::sys::SysReadDirEntry;
-use crate::{NonFatalErrorHandler, error::*};
+use crate::{error::*, NonFatalErrorHandler};
 #[cfg(feature = "regex")]
 use regex::Regex;
 #[cfg(feature = "regex")]
