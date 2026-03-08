@@ -5,6 +5,7 @@
 - Dependency on `home_env` removed, the implementation found in rust 1.85.0 for a home directory has been fixed.
   Thanks, [@madsmtm],(https://github.com/madsmtm) for this contribution to which!
 - Dependency on `winsafe` removed, code for Windows API is now handwritten.
+- Dependency on `rustix` removed, we now depend on `libc` directly to reduce compile times.
 
 ## 8.0.1
 
