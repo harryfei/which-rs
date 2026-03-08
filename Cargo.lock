@@ -171,8 +171,8 @@ dependencies = [
 name = "which"
 version = "8.0.2"
 dependencies = [
+ "libc",
  "regex",
- "rustix",
  "tempfile",
  "tracing",
 ]

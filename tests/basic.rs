@@ -33,8 +33,7 @@ mod real_sys {
         let bin = dir.join(path).with_extension(extension);
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
-        let mode = rustix::fs::Mode::XUSR.bits() as u32;
-        let mode = 0o666 | mode;
+        let mode = (0o666 | libc::S_IXUSR) as u32;
         fs::OpenOptions::new()
             .write(true)
             .create(true)
