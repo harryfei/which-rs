@@ -202,10 +202,18 @@ impl Sys for RealSys {
 
     #[cfg(any(unix, target_os = "wasi", target_os = "redox"))]
     fn is_valid_executable(&self, path: &Path) -> io::Result<bool> {
-        use rustix::fs as rfs;
-        rfs::access(path, rfs::Access::EXEC_OK)
-            .map(|_| true)
-            .map_err(|e| io::Error::from_raw_os_error(e.raw_os_error()))
+        use std::ffi::CString;
+        #[cfg(any(unix, target_os = "redox"))]
+        use std::os::unix::ffi::OsStrExt;
+        #[cfg(target_os = "wasi")]
+        use std::os::wasi::ffi::OsStrExt;
+
+        let path = CString::new(path.as_os_str().as_bytes())?;
+        if unsafe { libc::access(path.as_ptr(), libc::X_OK) } == 0 {
+            Ok(true)
+        } else {
+            Err(io::Error::last_os_error())
+        }
     }
 
     #[cfg(windows)]

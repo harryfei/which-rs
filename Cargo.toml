@@ -16,14 +16,14 @@ keywords = ["which", "which-rs", "unix", "command"]
 default = ["real-sys"]
 regex = ["dep:regex"]
 tracing = ["dep:tracing"]
-real-sys = ["dep:rustix"]
+real-sys = ["dep:libc"]
 
 [dependencies]
 regex = { version = "1.10.2", optional = true }
 tracing = { version = "0.1.40", default-features = false, optional = true }
 
 [target.'cfg(any(unix, target_os = "wasi", target_os = "redox"))'.dependencies]
-rustix = { version = "1.0.5", default-features = false, features = ["fs", "std"], optional = true }
+libc = { version = "0.2", optional = true }
 
 [dev-dependencies]
 tempfile = "3.9.0"
