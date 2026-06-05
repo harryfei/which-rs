@@ -236,6 +236,11 @@ impl Sys for RealSys {
             }
         }
     }
+
+    #[cfg(not(any(unix, windows, target_os = "wasi", target_os = "redox")))]
+    fn is_valid_executable(&self, _path: &Path) -> io::Result<bool> {
+        Ok(false)
+    }
 }
 
 impl<T> Sys for &T
