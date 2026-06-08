@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 8.0.3
+
+- Add fallback implementation of `is_valid_executable` allowing `which-rs` to compile on targets which are not Unix, Windows, WASI, or Redox. Thanks [@pmikolajczyk41](https://github.com/pmikolajczyk41) for your contribution to which!
+
 ## 8.0.2
 
 - Dependency on `home_env` removed, the implementation found in rust 1.85.0 for a home directory has been fixed.
