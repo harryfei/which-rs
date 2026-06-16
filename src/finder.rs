@@ -123,12 +123,20 @@ struct WhichFindIterator<TSys: Sys, F: NonFatalErrorHandler> {
 }
 
 impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
-    pub fn new_cwd(binary_name: PathBuf, cwd: &Path, sys: TSys, nonfatal_error_handler: F) -> Self {
+    pub fn new_cwd(
+        binary_name: PathBuf,
+        cwd: &Path,
+        sys: TSys,
+        mut nonfatal_error_handler: F,
+    ) -> Self {
         let path_extensions = if sys.is_windows() {
             sys.env_windows_path_ext()
         } else {
             Cow::Borrowed(Default::default())
         };
+        if sys.is_windows() && path_extensions.is_empty() && binary_name.extension().is_none() {
+            nonfatal_error_handler.handle(NonFatalError::PathExtNotPopulated);
+        }
         Self {
             sys,
             paths: PathsIter {
@@ -144,13 +152,16 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
         binary_name: PathBuf,
         paths: Vec<PathBuf>,
         sys: TSys,
-        nonfatal_error_handler: F,
+        mut nonfatal_error_handler: F,
     ) -> Self {
         let path_extensions = if sys.is_windows() {
             sys.env_windows_path_ext()
         } else {
             Cow::Borrowed(Default::default())
         };
+        if sys.is_windows() && path_extensions.is_empty() && binary_name.extension().is_none() {
+            nonfatal_error_handler.handle(NonFatalError::PathExtNotPopulated);
+        }
 
         let paths = paths.iter();
 
