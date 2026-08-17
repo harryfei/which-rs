@@ -276,6 +276,59 @@ mod real_sys {
     }
 
     #[test]
+    fn test_relative_path_entries_use_provided_cwd() {
+        let f = TestFixture::new();
+        #[cfg(unix)]
+        let expected = &f.bins[0];
+        #[cfg(windows)]
+        let expected = &f.bins[1];
+        let nested_cwd = f.tempdir.path().join("nested");
+        fs::create_dir(&nested_cwd).unwrap();
+
+        for (cwd, entry) in [
+            (f.tempdir.path(), "a"),
+            (f.tempdir.path(), "./a"),
+            (nested_cwd.as_path(), "../a"),
+        ] {
+            let paths = env::join_paths([entry]).unwrap();
+            let result = which::which_in(BIN_NAME, Some(paths), cwd).unwrap();
+
+            assert_eq!(
+                result.canonicalize().unwrap(),
+                *expected,
+                "PATH entry: {entry}"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_relative_path_entry_when_cwd_contains_path_separator() {
+        let f = TestFixture::new();
+        let cwd = f.tempdir.path().join("command:cwd");
+        let tools = cwd.join("tools");
+        fs::create_dir_all(&tools).unwrap();
+        let expected = mk_bin(&tools, BIN_NAME, "").unwrap();
+        let paths = env::join_paths(["./tools"]).unwrap();
+
+        let result = which::which_in(BIN_NAME, Some(paths), &cwd).unwrap();
+
+        assert_eq!(result.canonicalize().unwrap(), expected);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_empty_path_entry_uses_provided_cwd() {
+        let f = TestFixture::new();
+        let cwd = f.tempdir.path().join("a");
+        let paths = env::join_paths([PathBuf::new()]).unwrap();
+
+        let result = which::which_in(BIN_NAME, Some(paths), &cwd).unwrap();
+
+        assert_eq!(result.canonicalize().unwrap(), f.bins[0]);
+    }
+
+    #[test]
     fn test_which_all() {
         let f = TestFixture::new();
         let actual = _which_all(&f, BIN_NAME)
