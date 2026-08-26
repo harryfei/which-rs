@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 8.0.6
+
+- Bug fix: [#128](https://github.com/harryfei/which-rs/pull/128) Resolve relative PATH entries against the user provided CWD when available, rather than the process CWD.
+  Thanks [@RSS1102](https://github.com/RSS1102) for your contribution to which!
+
 ## 8.0.5
 
 - Bug fix: [#126](https://github.com/harryfei/which-rs/pull/126) Do not use current directory for search when provided path is absolute. Thanks [@weifanglab](https://github.com/weifanglab) for your contribution to which!
