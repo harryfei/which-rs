@@ -76,14 +76,15 @@ impl<TSys: Sys> Finder<TSys> {
             cwd.as_ref().map(|p| p.as_ref().display())
         );
 
+        let cwd = cwd.as_ref().map(AsRef::as_ref);
         let ret = match cwd {
             _ if path.is_absolute() => {
                 WhichFindIterator::new_path(path, self.sys, nonfatal_error_handler)
             }
             Some(cwd) if path.has_separator() => {
-                WhichFindIterator::new_cwd(path, cwd.as_ref(), self.sys, nonfatal_error_handler)
+                WhichFindIterator::new_cwd(path, cwd, self.sys, nonfatal_error_handler)
             }
-            _ => {
+            cwd => {
                 #[cfg(feature = "tracing")]
                 tracing::trace!(
                     "{} has no path seperators, so only paths in PATH environment variable will be searched.",
@@ -95,7 +96,7 @@ impl<TSys: Sys> Finder<TSys> {
                 if paths.is_empty() {
                     return Err(Error::CannotGetCurrentDirAndPathListEmpty);
                 }
-                WhichFindIterator::new_paths(path, paths, self.sys, nonfatal_error_handler)
+                WhichFindIterator::new_paths(path, paths, cwd, self.sys, nonfatal_error_handler)
             }
         };
         #[cfg(feature = "tracing")]
@@ -153,6 +154,7 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
     pub fn new_paths(
         binary_name: PathBuf,
         paths: Vec<PathBuf>,
+        cwd: Option<&Path>,
         sys: TSys,
         mut nonfatal_error_handler: F,
     ) -> Self {
@@ -165,15 +167,22 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
             nonfatal_error_handler.handle(NonFatalError::PathExtNotPopulated);
         }
 
-        let paths = paths.iter();
-
         // PowerShell Get-Command omits empty entries in PATH string, unix `which` command does not.
         // Emulate OS specific behavior here.
-        #[cfg(target_os = "windows")]
-        let paths = paths.filter(|p| !p.as_os_str().is_empty());
-
+        let is_windows = sys.is_windows();
         let paths = paths
-            .map(|p| tilde_expansion(&sys, p).join(&binary_name))
+            .into_iter()
+            .filter(|p| !is_windows || !p.as_os_str().is_empty())
+            .map(|p| {
+                let p = tilde_expansion(&sys, &p);
+                match cwd {
+                    Some(cwd) if is_ordinary_relative_path(&p, is_windows) => {
+                        p.into_owned().to_absolute(cwd)
+                    }
+                    _ => p.into_owned(),
+                }
+            })
+            .map(|p| p.join(&binary_name))
             .collect::<Vec<_>>();
 
         Self {
@@ -186,6 +195,25 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
             nonfatal_error_handler,
         }
     }
+}
+
+fn is_ordinary_relative_path(path: &Path, is_windows: bool) -> bool {
+    if path.has_root() || path.starts_with("~") {
+        return false;
+    }
+
+    if is_windows {
+        // `Sys::is_windows` can model Windows even when this crate was compiled for another
+        // platform, so do not rely only on the host platform's `Path::components` parsing here.
+        // Drive-relative (`C:foo`) and root-relative (`\foo`) paths retain their native semantics.
+        let path = path.as_os_str().to_string_lossy();
+        let bytes = path.as_bytes();
+        if path.starts_with('\\') || bytes.get(1) == Some(&b':') {
+            return false;
+        }
+    }
+
+    true
 }
 
 impl<TSys: Sys, F: NonFatalErrorHandler> Iterator for WhichFindIterator<TSys, F> {
@@ -386,6 +414,29 @@ impl<TSys: Sys, B: Borrow<Regex>, F: NonFatalErrorHandler> Iterator
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_ordinary_relative_path;
+    use std::path::Path;
+
+    #[test]
+    fn ordinary_relative_paths_are_resolved_against_cwd() {
+        for path in ["tools", "./tools", "../tools"] {
+            assert!(is_ordinary_relative_path(Path::new(path), false));
+            assert!(is_ordinary_relative_path(Path::new(path), true));
+        }
+    }
+
+    #[test]
+    fn tilde_and_windows_special_paths_keep_native_semantics() {
+        assert!(!is_ordinary_relative_path(Path::new("~/tools"), false));
+
+        for path in [r"C:tools", r"C:\tools", r"\tools", r"\\server\share\tools"] {
+            assert!(!is_ordinary_relative_path(Path::new(path), true));
         }
     }
 }
