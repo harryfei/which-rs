@@ -105,7 +105,7 @@ pub fn which_all_global<T: AsRef<OsStr>>(
     )
 }
 
-/// Find all binaries matching a regular expression in a the system PATH.
+/// Find all binaries matching a regular expression in the system PATH.
 ///
 /// Only available when feature `regex` is enabled.
 ///
