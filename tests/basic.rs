@@ -672,6 +672,8 @@ mod in_memory {
         home_dir: Option<PathBuf>,
         env_vars: HashMap<OsString, OsString>,
         root_dir: DirectoryEntry,
+        unreadable_directories: HashSet<PathBuf>,
+        path_aliases: HashMap<PathBuf, PathBuf>,
     }
 
     impl InMemorySys {
@@ -682,6 +684,8 @@ mod in_memory {
                 home_dir: None,
                 env_vars: Default::default(),
                 root_dir: DirectoryEntry::Directory(Directory::default()),
+                unreadable_directories: Default::default(),
+                path_aliases: Default::default(),
             }
         }
 
@@ -790,6 +794,7 @@ mod in_memory {
         }
 
         fn get_entry(&self, path: &Path) -> Option<&DirectoryEntry> {
+            let path = self.path_aliases.get(path).map_or(path, PathBuf::as_path);
             let mut current_entry = &self.root_dir;
             let mut components = path.components().peekable();
 
@@ -882,6 +887,9 @@ mod in_memory {
             &self,
             path: &Path,
         ) -> io::Result<Box<dyn Iterator<Item = io::Result<Self::ReadDirEntry>>>> {
+            if self.unreadable_directories.contains(path) {
+                return Err(Error::new(ErrorKind::PermissionDenied, "read_dir denied"));
+            }
             let entry = self
                 .get_entry_follow_symlink(path)
                 .ok_or_else(|| Error::new(ErrorKind::NotFound, "metadata: entry not found"))?;
@@ -926,6 +934,167 @@ mod in_memory {
         let config = which::WhichConfig::new_with_sys(sys).binary_name(OsString::from("exec1"));
         let result = config.first_result().unwrap();
         assert_eq!(result, PathBuf::from("/sub/dir2/exec1"));
+    }
+
+    #[test]
+    fn windows_explicit_path_preserves_exact_filename() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.write_non_executable("/bin/ASTRO.CMD");
+        sys.write_non_executable("/bin/astro.cmd");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("/bin/astro.cmd"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/bin/astro.cmd"));
+    }
+
+    #[test]
+    fn windows_lookup_preserves_native_unicode_matching() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/bin");
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.write_non_executable("/bin/über.cmd");
+        // Model native lookup in an ordinary case-insensitive Windows directory.
+        // ASCII-only matching of the enumerated filename cannot find this alias.
+        sys.path_aliases.insert(
+            PathBuf::from("/bin/ÜBER.CMD"),
+            PathBuf::from("/bin/über.cmd"),
+        );
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("ÜBER"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/bin/ÜBER.CMD"));
+    }
+
+    #[test]
+    fn windows_pathext_casing_on_case_sensitive_filesystem() {
+        for (pathext, extension) in [(".CMD", "cmd"), (".cmd", "CMD"), (".CMD", "cMd")] {
+            let mut sys = InMemorySys::new();
+            sys.is_windows = true;
+            sys.set_env_var("PATH", "/project/node_modules/.bin");
+            sys.set_env_var("PATHEXT", pathext);
+            // pnpm also creates an extensionless shell script beside the Windows shim.
+            sys.write_non_executable("/project/node_modules/.bin/astro");
+            let shim = PathBuf::from(format!("/project/node_modules/.bin/astro.{extension}"));
+            sys.write_non_executable(&shim);
+
+            for binary_name in ["astro", "astro.CMD"] {
+                let result = which::WhichConfig::new_with_sys(&sys)
+                    .binary_name(OsString::from(binary_name))
+                    .first_result()
+                    .unwrap();
+
+                assert_eq!(result, shim);
+            }
+        }
+    }
+
+    #[test]
+    fn windows_case_insensitive_lookup_preserves_path_order() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/first;/second");
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.write_non_executable("/first/astro.cmd");
+        sys.write_non_executable("/second/astro.CMD");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/first/astro.cmd"));
+    }
+
+    #[test]
+    fn windows_case_insensitive_lookup_preserves_pathext_order() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/bin");
+        sys.set_env_var("PATHEXT", ".EXE;.CMD");
+        sys.write_executable("/bin/astro.exe");
+        sys.write_non_executable("/bin/astro.CMD");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/bin/astro.exe"));
+    }
+
+    #[test]
+    fn windows_case_insensitive_lookup_checks_corrected_path() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/first;/second");
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.create_directory("/first/astro.cmd");
+        sys.write_non_executable("/second/astro.cmd");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/second/astro.cmd"));
+    }
+
+    #[test]
+    fn windows_case_insensitive_lookup_prefers_exact_filename() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/bin");
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.write_non_executable("/bin/ASTRO.CMD");
+        sys.write_non_executable("/bin/astro.CMD");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/bin/astro.CMD"));
+    }
+
+    #[test]
+    fn windows_lookup_without_directory_listing_permission() {
+        let mut sys = InMemorySys::new();
+        sys.is_windows = true;
+        sys.set_env_var("PATH", "/bin");
+        sys.set_env_var("PATHEXT", ".CMD");
+        sys.write_non_executable("/bin/astro.CMD");
+        sys.unreadable_directories.insert(PathBuf::from("/bin"));
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/bin/astro.CMD"));
+    }
+
+    #[test]
+    fn unix_lookup_remains_case_sensitive() {
+        let mut sys = InMemorySys::new();
+        sys.set_env_var("PATH", "/first:/second");
+        sys.write_executable("/first/ASTRO");
+        sys.write_executable("/second/astro");
+
+        let result = which::WhichConfig::new_with_sys(sys)
+            .binary_name(OsString::from("astro"))
+            .first_result()
+            .unwrap();
+
+        assert_eq!(result, PathBuf::from("/second/astro"));
     }
 
     #[test]

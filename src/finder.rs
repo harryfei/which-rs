@@ -8,7 +8,7 @@ use regex::Regex;
 #[cfg(feature = "regex")]
 use std::borrow::Borrow;
 use std::borrow::Cow;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 #[cfg(feature = "regex")]
 use std::io;
 use std::path::{Component, Path, PathBuf};
@@ -123,7 +123,14 @@ impl<TSys: Sys> Finder<TSys> {
 struct WhichFindIterator<TSys: Sys, F: NonFatalErrorHandler> {
     sys: TSys,
     paths: PathsIter<vec::IntoIter<PathBuf>>,
+    directory_entries: Option<DirectoryEntries>,
     nonfatal_error_handler: F,
+}
+
+struct DirectoryEntries {
+    parent: PathBuf,
+    // None if enumeration failed: the candidate may still be accessible directly.
+    names: Option<Vec<OsString>>,
 }
 
 impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
@@ -143,6 +150,7 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
                 current_path_with_index: None,
                 path_extensions,
             },
+            directory_entries: None,
             nonfatal_error_handler,
         }
     }
@@ -192,6 +200,7 @@ impl<TSys: Sys, F: NonFatalErrorHandler> WhichFindIterator<TSys, F> {
                 current_path_with_index: None,
                 path_extensions,
             },
+            directory_entries: None,
             nonfatal_error_handler,
         }
     }
@@ -221,12 +230,16 @@ impl<TSys: Sys, F: NonFatalErrorHandler> Iterator for WhichFindIterator<TSys, F>
 
     fn next(&mut self) -> Option<Self::Item> {
         for path in &mut self.paths {
+            // PATHEXT casing need not match the filename, even on Windows:
+            // directories can opt into case-sensitive lookup.
+            let path = correct_casing(
+                &self.sys,
+                path,
+                &mut self.directory_entries,
+                &mut self.nonfatal_error_handler,
+            );
             if is_valid(&self.sys, &path, &mut self.nonfatal_error_handler) {
-                return Some(correct_casing(
-                    &self.sys,
-                    path,
-                    &mut self.nonfatal_error_handler,
-                ));
+                return Some(path);
             }
         }
         None
@@ -316,25 +329,46 @@ fn tilde_expansion<TSys: Sys>(sys: TSys, p: &Path) -> Cow<'_, Path> {
 fn correct_casing<TSys: Sys, F: NonFatalErrorHandler>(
     sys: TSys,
     mut p: PathBuf,
+    directory_entries: &mut Option<DirectoryEntries>,
     nonfatal_error_handler: &mut F,
 ) -> PathBuf {
     if sys.is_windows() {
         if let (Some(parent), Some(file_name)) = (p.parent(), p.file_name()) {
-            if let Ok(iter) = sys.read_dir(parent) {
-                for e in iter {
-                    match e {
-                        Ok(e) => {
-                            if e.file_name().eq_ignore_ascii_case(file_name) {
-                                p.pop();
-                                p.push(e.file_name());
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            nonfatal_error_handler.handle(NonFatalError::Io(e));
-                        }
-                    }
+            // All PATHEXT candidates for a directory are consecutive. Read its names
+            // once rather than enumerating it again for every missing extension.
+            if directory_entries
+                .as_ref()
+                .map(|entries| entries.parent.as_path())
+                != Some(parent)
+            {
+                let names = sys.read_dir(parent).ok().and_then(|iter| {
+                    iter.map(|entry| entry.map(|entry| entry.file_name()))
+                        .collect::<std::io::Result<Vec<_>>>()
+                        .map_err(|error| nonfatal_error_handler.handle(NonFatalError::Io(error)))
+                        .ok()
+                });
+                *directory_entries = Some(DirectoryEntries {
+                    parent: parent.to_path_buf(),
+                    names,
+                });
+            }
+            if let Some(names) = directory_entries
+                .as_ref()
+                .and_then(|entries| entries.names.as_ref())
+            {
+                // Case-sensitive directories may contain multiple spellings.
+                // An exact match must win over a case-insensitive match.
+                if names.iter().any(|name| name == file_name) {
+                    return p;
                 }
+                if let Some(name) = names
+                    .iter()
+                    .find(|name| name.eq_ignore_ascii_case(file_name))
+                {
+                    p.set_file_name(name);
+                }
+                // Retain native lookup when ASCII matching finds nothing.
+                // Windows can equate non-ASCII casing in ordinary directories.
             }
         }
     }
