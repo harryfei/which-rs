@@ -24,7 +24,7 @@ trait PathExt {
 
 impl PathExt for PathBuf {
     fn has_separator(&self) -> bool {
-        self.components().count() > 1
+        self.components().count() > 1 || has_trailing_separator(self)
     }
 
     fn to_absolute<P>(self, cwd: P) -> PathBuf
@@ -39,9 +39,25 @@ impl PathExt for PathBuf {
                 self.components()
                     .skip_while(|c| matches!(c, Component::CurDir)),
             );
+            // `components()` drops a trailing `/` or `/.`, which require the
+            // path to be a directory. Keep the trailing separator.
+            if has_trailing_separator(&self) {
+                new_path.push("");
+            }
             new_path
         }
     }
+}
+
+/// Whether the path ends in a separator or a `/.` component, both of which
+/// `Path::components` silently drops.
+fn has_trailing_separator(path: &Path) -> bool {
+    let s = path.as_os_str().to_string_lossy();
+    let s = s
+        .strip_suffix('.')
+        .filter(|r| r.ends_with(std::path::is_separator))
+        .unwrap_or(&s);
+    s.ends_with(std::path::is_separator)
 }
 
 pub struct Finder<TSys: Sys> {

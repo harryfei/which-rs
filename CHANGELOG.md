@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## Unreleased
+
+- Bug fix: [#132](https://github.com/harryfei/which-rs/issues/132) A relative query ending in `/` or `/.` no longer resolves to a regular file; the trailing separator is preserved when making the path absolute.
+
 ## 8.0.6
 
 - Bug fix: [#128](https://github.com/harryfei/which-rs/pull/128) Resolve relative PATH entries against the user provided CWD when available, rather than the process CWD.
