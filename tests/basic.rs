@@ -171,6 +171,23 @@ mod real_sys {
 
     #[test]
     #[cfg(unix)]
+    fn test_trailing_separator_requires_directory() {
+        let f = TestFixture::new();
+        let name = format!("./a/{}", BIN_NAME);
+        assert!(_which_uncanonicalized(&f, &name).is_ok());
+        for suffix in ["/", "/."] {
+            let query = format!("{name}{suffix}");
+            assert!(
+                _which_uncanonicalized(&f, &query).is_err(),
+                "{query} should not resolve to a file"
+            );
+        }
+        // Without a leading `./` the trailing `/.` still makes this a path lookup.
+        assert!(_which_uncanonicalized(&f, format!("a/{BIN_NAME}/.")).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
     fn test_which_tilde() {
         let old_home = env::var_os("HOME");
         let f = TestFixture::new_with_tilde_path();
