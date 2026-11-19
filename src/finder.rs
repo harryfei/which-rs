@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 #[cfg(feature = "regex")]
 use std::io;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR_STR};
 use std::vec;
 
 trait PathExt {
@@ -41,8 +41,8 @@ impl PathExt for PathBuf {
             );
             // `components()` drops a trailing `/` or `/.`, which require the
             // path to be a directory. Keep the trailing separator.
-            if has_trailing_separator(&self) {
-                new_path.push("");
+            if has_trailing_separator(&self) && !has_trailing_separator(&new_path) {
+                new_path.as_mut_os_string().push(MAIN_SEPARATOR_STR);
             }
             new_path
         }
